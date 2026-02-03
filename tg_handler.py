@@ -20,8 +20,8 @@ warnings.filterwarnings("ignore")
 class Stat():
 
     # Id и Hash приложения Telegram
-    API_ID = "2713138"
-    API_HASH = "2457389818a0759c4fb47ffaf97330be"
+    API_ID = 34776100
+    API_HASH = "7d64e4ea96b357016ae00e630f6c57ed"
 
     def __init__(self, CHAT_ID_in=None):
 
@@ -128,41 +128,36 @@ class Stat():
 
 
 def main():
-    with open('list_channel.txt', 'r') as f:
+    with open('list_channels.txt', 'r') as f:
         channels = f.readlines()
     clear_channels = [chan.strip() for chan in channels]
 
-    with open('getted_chan.txt', 'r') as f:
-        get_channels = f.readlines()
-    clear_get_channels = [chan.strip() for chan in get_channels]
-
     for chan in tqdm(clear_channels):
 
-        if chan not in clear_get_channels:
 
+        try:
+            tele_stat = Stat(chan)
+            data_posts = tele_stat.get_posts_data()
+            cur_df_posts = pd.DataFrame(data_posts)
+            cur_df_posts.columns = ['CHAT_ID', 'message_id', 'message_date', 'message']
+            #cur_df_posts.to_excel(r'data\\' + chan + '.xlsx')
+
+            #cur_df_posts.to_csv(r'data\\' + chan + '.csv', sep='\t')
+            with open(r'data\\' + chan + '.pickle', 'wb') as f:
+                pickle.dump(cur_df_posts, f)
+            print('\n', cur_df_posts.shape[0])
+            tele_stat.close()
+            del tele_stat
+            time.sleep(1)
+        except Exception as e:
+            print('Error:\n', traceback.format_exc())
+            print(f'\nNo user has {chan} as username')
             try:
-                tele_stat = Stat(chan)
-                data_posts = tele_stat.get_posts_data()
-                cur_df_posts = pd.DataFrame(data_posts)
-                cur_df_posts.columns = ['CHAT_ID', 'message_id', 'message_date', 'message']
-                #cur_df_posts.to_excel(r'data\\' + chan + '.xlsx')
-
-                #cur_df_posts.to_csv(r'data\\' + chan + '.csv', sep='\t')
-                with open(r'data\\' + chan + '.pickle', 'wb') as f:
-                    pickle.dump(cur_df_posts, f)
-                print('\n', cur_df_posts.shape[0])
                 tele_stat.close()
                 del tele_stat
-                time.sleep(1)
-            except Exception as e:
-                print('Error:\n', traceback.format_exc())
-                print(f'\nNo user has {chan} as username')
-                try:
-                    tele_stat.close()
-                    del tele_stat
-                    time.sleep(12)
-                except:
-                    print('\n\nError on get channel info\n\n')
+                time.sleep(12)
+            except:
+                print('\n\nError on get channel info\n\n')
 
 
 if __name__ == "__main__":

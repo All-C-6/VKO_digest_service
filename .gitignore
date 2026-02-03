@@ -1,7 +1,8 @@
 *.pdf
 *.xlsx
 *.docx
-
+*test*
+*.session
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

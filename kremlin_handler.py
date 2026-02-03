@@ -178,13 +178,13 @@ def extract_article_text_with_options(
         return None
 
 
-def get_latest_kremlin_docs(start_date: str, end_date: str, delay_between_requests: float = 1.0) -> list[dict[str, str]]:
+def get_latest_kremlin_docs(start_date: datetime, end_date=datetime.today(), delay_between_requests: float = 1.0) -> list[dict[str, str]]:
     """
     Загружает список нормативно-правовых актов с сайта kremlin.ru за указанный период.
 
     Args:
-        start_date (str): Дата начала периода в формате "DD.MM.YYYY"
-        end_date (str): Дата окончания периода в формате "DD.MM.YYYY" 
+        start_date (datetime): Дата начала периода, объект datetime
+        end_date (datetime): Дата окончания периода, объект datetime, по-умолчанию сегодня
         delay_between_requests (float): Задержка между запросами в секундах
 
     Returns:
@@ -199,13 +199,6 @@ def get_latest_kremlin_docs(start_date: str, end_date: str, delay_between_reques
 
     # Настройка логирования
     logger = logging.getLogger(__name__)
-
-    # Валидация дат
-    try:
-        datetime.strptime(start_date, "%d.%m.%Y")
-        datetime.strptime(end_date, "%d.%m.%Y")
-    except ValueError:
-        raise ValueError("Даты должны быть в формате DD.MM.YYYY")
 
     base_url = "http://kremlin.ru/acts/bank/search"
     kremlin_base_url = "http://kremlin.ru"
@@ -226,8 +219,8 @@ def get_latest_kremlin_docs(start_date: str, end_date: str, delay_between_reques
         try:
             # Формирование URL для текущей страницы
             params = {
-                'date_since': start_date,
-                'date_till': end_date
+                'date_since': start_date.strftime("%d.%m.%y"),
+                'date_till': end_date.strftime("%d.%m.%y")
             }
 
             if current_page > 1:
@@ -260,7 +253,7 @@ def get_latest_kremlin_docs(start_date: str, end_date: str, delay_between_reques
             # Обработка найденных документов
             for document_entry in document_entries:
                 try:
-                    document_info = _parse_single_document_entry(document_entry, kremlin_base_url)
+                    document_info = parse_single_document_entry(document_entry, kremlin_base_url)
                     if document_info:
                         documents_list.append(document_info)
                         logger.debug(f"Добавлен документ: {document_info['title'][:50]}...")
@@ -289,7 +282,7 @@ def get_latest_kremlin_docs(start_date: str, end_date: str, delay_between_reques
     return documents_list
 
 
-def _parse_single_document_entry(document_entry, kremlin_base_url: str) -> Optional[dict[str, str]]:
+def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Optional[dict[str, str]]:
     """
     Парсит информацию об отдельном документе из HTML элемента.
 
@@ -315,11 +308,11 @@ def _parse_single_document_entry(document_entry, kremlin_base_url: str) -> Optio
 
     # Поиск дополнительной мета-информации
     meta_acts_element = link_element.find('span', class_='hentry__meta_acts')
-    document_meta = meta_acts_element.get_text(strip=True) if meta_acts_element else ""
+    document_meta = drop_nbsp(meta_acts_element.get_text(strip=True)) if meta_acts_element else ""
 
     # Поиск даты публикации
     time_element = link_element.find('time')
-    document_date = time_element.get_text(strip=True) if time_element else ""
+    document_date = drop_nbsp(time_element.get_text(strip=True)) if time_element else ""
     document_datetime = time_element.get('datetime') if time_element else ""
 
     # Формирование полного URL
@@ -329,14 +322,24 @@ def _parse_single_document_entry(document_entry, kremlin_base_url: str) -> Optio
     # Очистка заголовка от мета-информации и даты
     clean_document_title = document_title
     if document_meta:
-        clean_document_title = clean_document_title.replace(document_meta, '').strip()
+        clean_document_title = drop_nbsp(clean_document_title.replace(document_meta, '').strip())
     if document_date:
-        clean_document_title = clean_document_title.replace(document_date, '').strip()
+        clean_document_title = drop_nbsp(clean_document_title.replace(document_date, '').strip())
 
     return {
         'title': clean_document_title,
         'meta': document_meta,
         'date': document_date,
         'datetime': document_datetime,
-        'url': full_document_url
+        'link': full_document_url
     }
+
+
+def drop_nbsp(text: str) -> str:
+    """
+    Функция для удаления неразрывных пробелов из текста
+    
+    :param text (str): текст для очистки от неразрывных пробелов
+    :return (str): текст после очистки
+    """
+    return text.replace('\xa0', ' ')

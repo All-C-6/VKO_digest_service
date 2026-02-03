@@ -1,3 +1,9 @@
+"""
+Модуль преднзначен для извлечения данных с сайта Центробанка РФ.
+С помощью RSS получается список документов, извлекается набор с датами позднее заданной.
+Другая функция сохраняет PDF файлы по ссылкам.
+"""
+
 import requests
 from pathlib import Path
 from urllib.parse import unquote
@@ -92,7 +98,7 @@ def download_cbr_pdf(url: str, destination_directory: str = ".") -> str:
     return str(full_file_path)
 
 
-def get_latest_cbr_docs(target_datetime: datetime) -> list[dict[str, str]]:
+def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
     """
     Получает список документов ЦБ РФ, опубликованных позднее указанной даты-времени.
 
@@ -116,7 +122,7 @@ def get_latest_cbr_docs(target_datetime: datetime) -> list[dict[str, str]]:
     cbr_rss_url = "https://www.cbr.ru/rss/navr"
     resulting_documents_list = []
 
-    logger.info(f"Начинаем получение документов ЦБ РФ позднее {target_datetime.isoformat()}")
+    logger.info(f"Начинаем получение документов ЦБ РФ позднее {start_date.isoformat()}")
 
     try:
         # Выполняем запрос к RSS-ленте ЦБ РФ
@@ -153,11 +159,11 @@ def get_latest_cbr_docs(target_datetime: datetime) -> list[dict[str, str]]:
                 parsed_publication_datetime = datetime.strptime(
                     publication_date_string, 
                     "%a, %d %b %Y %H:%M:%S %z"
-                )
+                ).replace(tzinfo=None)
 
                 # Проверяем, что документ опубликован позднее целевой даты
-                if parsed_publication_datetime > target_datetime:
-                    document_info_dict = {
+                if parsed_publication_datetime > start_date:
+                    document_info = {
                         'title': document_title.text.strip(),
                         'link': document_link.text.strip(),
                         'guid': document_guid.text.strip() if document_guid is not None else '',
@@ -166,10 +172,10 @@ def get_latest_cbr_docs(target_datetime: datetime) -> list[dict[str, str]]:
                         'pub_date_parsed': parsed_publication_datetime.isoformat()
                     }
 
-                    resulting_documents_list.append(document_info_dict)
+                    resulting_documents_list.append(document_info)
                     logger.debug(f"Добавлен документ: {document_title.text.strip()[:100]}...")
                 else:
-                    logger.debug(f"Документ пропущен (дата {parsed_publication_datetime} <= {target_datetime})")
+                    logger.debug(f"Документ пропущен (дата {parsed_publication_datetime} <= {start_date})")
 
             except ValueError as date_parsing_error:
                 logger.error(f"Ошибка парсинга даты в элементе: {date_parsing_error}")
@@ -178,7 +184,7 @@ def get_latest_cbr_docs(target_datetime: datetime) -> list[dict[str, str]]:
                 logger.error(f"Ошибка обработки элемента RSS: {item_processing_error}")
                 continue
 
-        logger.info(f"Обработка завершена. Найдено {len(resulting_documents_list)} документов позднее {target_datetime.isoformat()}")
+        logger.info(f"Обработка завершена. Найдено {len(resulting_documents_list)} документов позднее {start_date.isoformat()}")
         return resulting_documents_list
 
     except requests.RequestException as network_error:
