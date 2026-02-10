@@ -11,6 +11,7 @@ import re
 import xml.etree.ElementTree as ET
 import logging
 from datetime import datetime
+import time
 
 from utils import setup_logging
 
@@ -106,23 +107,23 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
     словарей с информацией о каждом документе, опубликованном после указанной даты.
 
     Args:
-        target_datetime (datetime): Дата-время, позднее которой нужно искать документы.
+        start_date (datetime): Дата-время, позднее которой нужно искать документы.
                                    Должна быть в timezone-aware формате или UTC.
 
     Returns:
-        List[Dict[str, str]]: Список словарей, каждый из которых содержит:
+    
+        list (list[Dict[str, str]]): Список словарей, каждый из которых содержит:
             - 'title': Заголовок документа
             - 'link': Ссылка на документ
-            - 'guid': Уникальный идентификатор документа  
-            - 'description': Описание документа
+            - 'meta': Описание документа
             - 'pub_date': Дата публикации в строковом формате
-            - 'pub_date_parsed': Распарсенная дата публикации в ISO формате
 
     """
     cbr_rss_url = "https://www.cbr.ru/rss/navr"
     resulting_documents_list = []
 
-    logger.info(f"Начинаем получение документов ЦБ РФ позднее {start_date.isoformat()}")
+    start_date = start_date.date()
+    logger.info(f"Начинаем получение документов ЦБ РФ позднее {start_date}")
 
     try:
         # Выполняем запрос к RSS-ленте ЦБ РФ
@@ -159,17 +160,15 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
                 parsed_publication_datetime = datetime.strptime(
                     publication_date_string, 
                     "%a, %d %b %Y %H:%M:%S %z"
-                ).replace(tzinfo=None)
+                ).replace(tzinfo=None).date()
 
                 # Проверяем, что документ опубликован позднее целевой даты
                 if parsed_publication_datetime > start_date:
                     document_info = {
                         'title': document_title.text.strip(),
                         'link': document_link.text.strip(),
-                        'guid': document_guid.text.strip() if document_guid is not None else '',
-                        'description': document_description.text.strip() if document_description is not None else '',
-                        'pub_date': publication_date_string,
-                        'pub_date_parsed': parsed_publication_datetime.isoformat()
+                        'meta': document_description.text.strip() if document_description is not None else '',
+                        'pub_date': parsed_publication_datetime.isoformat()
                     }
 
                     resulting_documents_list.append(document_info)
@@ -262,3 +261,87 @@ def get_central_bank_draft_regulatory_acts() -> list[dict]:
         print(f"Ошибка при парсинге XML: {parse_error}")
     except Exception as e_other:
         print(f"Иная ошибка: {e_other}")
+
+
+
+def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
+    """
+    Загружает новости и события с сайта ЦБ РФ от текущей даты до start_date.
+
+    Args:
+        start_date: Дата, до которой нужно загрузить новости (включительно)
+
+    Returns:
+        Список словарей с ключами: title, link, meta, pub_date
+    """
+    base_url = "https://www.cbr.ru/FPEventAndPress/"
+
+    # Параметры запроса (все, кроме page, остаются неизменными)
+    params = {
+        "page": 0,
+        "IsEng": "false",
+        "type": 100,
+        "pagesize": 10,
+        "_": int(time.time() * 1000)  # Текущий timestamp в миллисекундах
+    }
+
+    collected_news_list = []
+    current_page_number = 0
+    should_continue_pagination = True
+
+    while should_continue_pagination:
+        params["page"] = current_page_number
+
+        try:
+            response = requests.get(base_url, params=params, timeout=10)
+            response.raise_for_status()
+
+            json_data = response.json()
+
+            # Проверяем, есть ли данные на странице
+            if not json_data or len(json_data) == 0:
+                break
+
+            for news_item in json_data:
+                # Парсим дату публикации
+                publication_datetime = datetime.fromisoformat(news_item["DT"].replace("Z", "+00:00"))
+
+                # Если дата новости старше start_date, прекращаем сбор
+                if publication_datetime.date() < start_date.date():
+                    should_continue_pagination = False
+                    break
+
+                # Формируем ссылку на новость
+                article_id = news_item.get("doc_htm", "")
+                article_link = f"https://cbr.ru/press/event/?id={article_id}"
+
+                # Формируем meta строку (можно включить дополнительную информацию)
+                meta_parts = []
+                if news_item.get("Important"):
+                    meta_parts.append("Важное")
+                if news_item.get("Video"):
+                    meta_parts.append("Видео")
+                meta_string = ", ".join(meta_parts) if meta_parts else ""
+
+                # Добавляем в результат
+                collected_news_list.append({
+                    "title": news_item.get("name_doc", ""),
+                    "link": article_link,
+                    "meta": meta_string,
+                    "pub_date": publication_datetime.strftime("%Y-%m-%d")
+                })
+
+            # Переходим к следующей странице
+            current_page_number += 1
+
+            # Небольшая задержка, чтобы не перегружать сервер
+            time.sleep(0.3)
+
+        except requests.RequestException as request_error:
+            print(f"Ошибка при запросе страницы {current_page_number}: {request_error}")
+            break
+        except (KeyError, ValueError) as parsing_error:
+            print(f"Ошибка при обработке данных на странице {current_page_number}: {parsing_error}")
+            break
+
+    return collected_news_list

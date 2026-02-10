@@ -1,3 +1,7 @@
+"""
+Модуль содержит функции для получения данных с сайта kremlin.ru и последующей обработки
+"""
+
 import requests
 from lxml import html, etree
 from typing import Optional
@@ -18,7 +22,7 @@ def get_webpage_as_xml_tree(
     cookie_sid: Optional[str] = None,
     timeout_seconds: int = 30,
     verify_ssl: bool = True
-) -> Optional[etree._Element]:
+) -> etree._Element:
     """
     Получает веб-страницу по указанному URL и возвращает её в виде XML-дерева через lxml.
 
@@ -192,9 +196,8 @@ def get_latest_kremlin_docs(start_date: datetime, end_date=datetime.today(), del
                              Каждый словарь содержит поля:
                              - 'title': заголовок документа
                              - 'meta': дополнительная информация (например, "О Храмове О.В.")
-                             - 'date': дата публикации
-                             - 'datetime': дата в формате datetime
-                             - 'url': полный URL документа
+                             - 'pub_date': дата публикации
+                             - 'link': полный URL документа
     """
 
     # Настройка логирования
@@ -313,7 +316,7 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
     # Поиск даты публикации
     time_element = link_element.find('time')
     document_date = drop_nbsp(time_element.get_text(strip=True)) if time_element else ""
-    document_datetime = time_element.get('datetime') if time_element else ""
+    document_datetime = datetime.strptime(time_element.get('datetime'), "%Y-%m-%d").date().strftime("%Y-%m-%d") if time_element else ""
 
     # Формирование полного URL
     document_href = link_element.get('href')
@@ -329,8 +332,7 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
     return {
         'title': clean_document_title,
         'meta': document_meta,
-        'date': document_date,
-        'datetime': document_datetime,
+        'pub_date': document_datetime,
         'link': full_document_url
     }
 
