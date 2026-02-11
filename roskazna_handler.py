@@ -45,8 +45,7 @@ def get_latest_roskazna_docs(start_date: datetime) -> List[Dict[str, str]]:
         Список словарей с данными новостей, содержащих ключи:
         - title: заголовок новости
         - link: ссылка на новость
-        - description: описание новости
-        - category: категория новости
+        - meta: описание новости
         - pub_date: дата публикации (без времени)
     """
     roskazna_rss_url = "https://roskazna.gov.ru/rss"

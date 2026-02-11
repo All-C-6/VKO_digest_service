@@ -165,6 +165,7 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
                 # Проверяем, что документ опубликован позднее целевой даты
                 if parsed_publication_datetime > start_date:
                     document_info = {
+                        'id': document_guid.text.strip(),
                         'title': document_title.text.strip(),
                         'link': document_link.text.strip(),
                         'meta': document_description.text.strip() if document_description is not None else '',
@@ -325,6 +326,7 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
 
                 # Добавляем в результат
                 collected_news_list.append({
+                    "id": article_id,
                     "title": news_item.get("name_doc", ""),
                     "link": article_link,
                     "meta": meta_string,
