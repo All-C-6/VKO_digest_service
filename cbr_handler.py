@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 import time
 
-from utils import setup_logging
+from utils import setup_logging, drop_nbsp
 
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/cbr_handler.log", level="INFO")
@@ -327,7 +327,7 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
                 # Добавляем в результат
                 collected_news_list.append({
                     "id": article_id,
-                    "title": news_item.get("name_doc", ""),
+                    "title": drop_nbsp(news_item.get("name_doc", "")),
                     "link": article_link,
                     "meta": meta_string,
                     "pub_date": publication_datetime.strftime("%Y-%m-%d")

@@ -2,7 +2,6 @@ import requests
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from datetime import datetime
-from typing import List, Dict, Optional
 import logging
 
 from utils import setup_logging
@@ -33,7 +32,7 @@ class TextExtractorHTMLParser(HTMLParser):
         return ' '.join(self.extracted_text_parts)
 
 
-def get_latest_roskazna_docs(start_date: datetime) -> List[Dict[str, str]]:
+def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
     """
     Получает RSS-ленту новостей с сайта Росказны и возвращает новости,
     опубликованные после указанной даты.
@@ -48,6 +47,7 @@ def get_latest_roskazna_docs(start_date: datetime) -> List[Dict[str, str]]:
         - meta: описание новости
         - pub_date: дата публикации (без времени)
     """
+    
     roskazna_rss_url = "https://roskazna.gov.ru/rss"
     filtered_news_items_list = []
 
@@ -93,7 +93,7 @@ def get_latest_roskazna_docs(start_date: datetime) -> List[Dict[str, str]]:
 def extract_news_item_data(
     news_item_element: ET.Element, 
     start_date: datetime
-) -> Optional[Dict[str, str]]:
+) -> dict[str, str]:
     """
     Извлекает данные из элемента <item> RSS-ленты.
 
@@ -130,6 +130,7 @@ def extract_news_item_data(
             print(e)
 
         news_item_data_dict = {
+            'id': news_link.split('/')[-1],
             'title': news_title,
             'link': news_link,
             'meta': news_description,
@@ -143,7 +144,7 @@ def extract_news_item_data(
         return None
 
 
-def get_element_text(parent_element: ET.Element, tag_name: str) -> Optional[str]:
+def get_element_text(parent_element: ET.Element, tag_name: str) -> str | None:
     """
     Безопасно извлекает текст из XML элемента.
 

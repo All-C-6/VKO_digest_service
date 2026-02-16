@@ -66,3 +66,13 @@ def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = No
     logger.propagate = False
 
     return logger
+
+
+def drop_nbsp(text: str) -> str:
+    """
+    Функция для удаления неразрывных пробелов из текста
+    
+    :param text (str): текст для очистки от неразрывных пробелов
+    :return (str): текст после очистки
+    """
+    return text.replace('\xa0', ' ')

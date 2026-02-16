@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import time
 
-from utils import setup_logging
+from utils import setup_logging, drop_nbsp
 
 
 # Настройка логирования
@@ -330,19 +330,9 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
         clean_document_title = drop_nbsp(clean_document_title.replace(document_date, '').strip())
 
     return {
-        "id": document_href,
+        "id": document_href.split("/")[-1],
         'title': clean_document_title,
         'meta': document_meta,
         'pub_date': document_datetime,
         'link': full_document_url
     }
-
-
-def drop_nbsp(text: str) -> str:
-    """
-    Функция для удаления неразрывных пробелов из текста
-    
-    :param text (str): текст для очистки от неразрывных пробелов
-    :return (str): текст после очистки
-    """
-    return text.replace('\xa0', ' ')

@@ -105,32 +105,10 @@ def get_ach_latest_docs(start_date: datetime) -> list[dict]:
                 "title": document_item.get("NAME"),
                 "meta": cleaned_meta_text,
                 "link": report_link,
-                "pub_date": parsed_document_date,
+                "pub_date": parsed_document_date.strftime("%Y-%m-%d"),
             }
             processed_documents_list.append(document_details)
 
     logging.info(f"Обработано и отфильтровано {len(processed_documents_list)} документов.")
 
     return processed_documents_list
-
-# --- Пример использования функции ---
-if __name__ == "__main__":
-    # Устанавливаем дату, с которой мы хотим получать документы
-    # Например, за последние 30 дней от сегодняшней даты (6 февраля 2026)
-    thirty_days_ago = datetime.now() - timedelta(days=30)
-
-    print(f"Ищем документы, опубликованные с {thirty_days_ago.strftime('%d.%m.%Y')}")
-    print("-" * 30)
-
-    # Вызываем основную функцию
-    latest_documents = get_ach_latest_docs(start_date=thirty_days_ago)
-
-    if latest_documents:
-        logging.info(f"Найдено {len(latest_documents)} новых документов.")
-
-        # Выведем информацию о первом найденном документе для примера
-        first_document = latest_documents[0]
-
-        print(f"Имеются поля: {first_document.keys()}")
-    else:
-        logging.info("Новых документов за указанный период не найдено.")
