@@ -2,15 +2,18 @@ import logging
 from pathlib import Path
 import inspect
 
-def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = None):
+def setup_logging(log_to: list = ["file"], log_file_path: str = None, level="INFO", logger_name: str = None):
     """
     Установка логгирования для конкретного модуля
     Создает отдельный логгер с собственным файлом, не влияя на другие модули
 
     Args:
-        log_file_path: Путь к файлу логов. 
+        log_file_path: Путь к файлу логов.
+
                       None - логи только в консоль, файл не создается
+
                       "default" - автоматический путь logs/{logger_name}.log
+
                       str - явный путь к файлу логов
         level: Уровень логирования
         logger_name: Имя логгера (по умолчанию - имя вызывающего модуля)
@@ -37,7 +40,7 @@ def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = No
     )
 
     # Если log_file_path не None, создаем обработчик для файла
-    if log_file_path is not None:
+    if log_file_path is not None and "file" in log_to:
         # Определение пути к файлу логов
         if log_file_path == "default":
             log_file_path = f'logs/{logger_name}.log'
@@ -56,11 +59,12 @@ def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = No
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
-    # Добавляем обработчик для консоли (если нужен вывод при log_file_path=None)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, level))
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Если задан вывод в консоль, добавляем обработчик для консоли
+    if "console" in log_to:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(getattr(logging, level))
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     # Отключаем распространение логов к корневому логгеру
     logger.propagate = False

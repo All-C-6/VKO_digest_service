@@ -13,7 +13,6 @@ import time
 from utils import setup_logging, drop_nbsp
 
 
-# Настройка логирования
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/kremlin_handler.log", level="INFO")
 
