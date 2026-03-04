@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 import inspect
+import pandas as pd
+import logging
 
 def setup_logging(log_to: list = ["file"], log_file_path: str = None, level="INFO", logger_name: str = None):
     """
@@ -80,3 +82,85 @@ def drop_nbsp(text: str) -> str:
     :return (str): текст после очистки
     """
     return text.replace('\xa0', ' ')
+
+
+def save_list_dict_to_excel(
+    data_list_of_dictionaries: list[dict[str]], 
+    output_excel_file_path: str,
+    sheet_name: str = "Sheet1",
+    index_column_included: bool = False
+) -> bool:
+    """
+    Сохраняет список словарей в Excel файл (.xlsx).
+
+    Args:
+        data_list_of_dictionaries: Список словарей для сохранения
+        output_excel_file_path: Путь к выходному Excel файлу
+        sheet_name: Название листа в Excel файле (по умолчанию "Sheet1")
+        index_column_included: Включать ли индексную колонку (по умолчанию False)
+
+    Returns:
+        bool: True если сохранение прошло успешно, False в случае ошибки
+
+    Raises:
+        ValueError: Если список пуст или содержит некорректные данные
+        FileNotFoundError: Если не удается создать файл по указанному пути
+    """
+
+    # Проверяем входные данные
+    if not data_list_of_dictionaries:
+        error_message = "Список словарей пуст - нечего сохранять"
+        logging.error(error_message)
+        raise ValueError(error_message)
+
+    if not isinstance(data_list_of_dictionaries, list):
+        error_message = "Входные данные должны быть списком"
+        logging.error(error_message)
+        raise ValueError(error_message)
+
+    # Проверяем что все элементы являются словарями
+    for index, dictionary_item in enumerate(data_list_of_dictionaries):
+        if not isinstance(dictionary_item, dict):
+            error_message = f"Элемент с индексом {index} не является словарем"
+            logging.error(error_message)
+            raise ValueError(error_message)
+
+    try:
+        # Создаем DataFrame из списка словарей
+        dataframe_from_dictionaries = pd.DataFrame(data_list_of_dictionaries)
+
+        logging.info(f"Создан DataFrame с размерностью {dataframe_from_dictionaries.shape}")
+        logging.info(f"Столбцы таблицы: {list(dataframe_from_dictionaries.columns)}")
+
+        # Сохраняем в Excel файл
+        with pd.ExcelWriter(
+            output_excel_file_path, 
+            engine='openpyxl', 
+            mode='w'
+        ) as excel_writer:
+            dataframe_from_dictionaries.to_excel(
+                excel_writer,
+                sheet_name=sheet_name,
+                index=index_column_included,
+                na_rep=''  # Заменяем NaN пустыми строками
+            )
+
+        logging.info(f"Данные успешно сохранены в файл: {output_excel_file_path}")
+        logging.info(f"Лист: {sheet_name}, строк данных: {len(data_list_of_dictionaries)}")
+
+        return True
+
+    except PermissionError as permission_error:
+        error_message = f"Нет прав для записи в файл {output_excel_file_path}: {permission_error}"
+        logging.error(error_message)
+        return False
+
+    except FileNotFoundError as file_not_found_error:
+        error_message = f"Не удается создать файл по пути {output_excel_file_path}: {file_not_found_error}"
+        logging.error(error_message)
+        raise FileNotFoundError(error_message)
+
+    except Exception as unexpected_error:
+        error_message = f"Неожиданная ошибка при сохранении в Excel: {unexpected_error}"
+        logging.error(error_message)
+        return False

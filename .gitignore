@@ -1,6 +1,8 @@
 *.pdf
 *.xlsx
 *.docx
+*.docx#
+*.xlsx#
 *test*
 *.session
 

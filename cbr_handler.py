@@ -314,7 +314,10 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
 
                 # Формируем ссылку на новость
                 article_id = news_item.get("doc_htm", "")
-                article_link = f"https://cbr.ru/press/event/?id={article_id}"
+                if article_id.endswith(".htm"):
+                    article_link = f"https://cbr.ru/press/pr/?file={article_id}"
+                else:
+                    article_link = f"https://cbr.ru/press/event/?id={article_id}"
 
                 # Формируем meta строку (можно включить дополнительную информацию)
                 meta_parts = []
