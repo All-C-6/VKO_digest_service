@@ -9,11 +9,12 @@ from pathlib import Path
 from urllib.parse import unquote
 import re
 import xml.etree.ElementTree as ET
+from lxml import html
 import logging
 from datetime import datetime
 import time
 
-from utils import setup_logging, drop_nbsp
+from utils import setup_logging, drop_uwanted_symbols, extract_pdf_full_text_advanced
 
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/cbr_handler.log", level="INFO")
@@ -108,11 +109,11 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
 
     Args:
         start_date (datetime): Дата-время, позднее которой нужно искать документы.
-                                   Должна быть в timezone-aware формате или UTC.
 
     Returns:
     
         list (list[Dict[str, str]]): Список словарей, каждый из которых содержит:
+            - 'id': Идентификатор документа Банка России
             - 'title': Заголовок документа
             - 'link': Ссылка на документ
             - 'meta': Описание документа
@@ -198,19 +199,21 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
         raise
 
 
-def get_central_bank_draft_regulatory_acts() -> list[dict]:
+def get_central_bank_draft_regulatory_acts(start_date: datetime) -> list[dict]:
     """
     Получает последние проекты нормативных актов (НПА) от Центрального Банка РФ.
 
+    Args:
+        start_date (datetime): Дата-время, позднее которой нужно искать проекты документов.
+    
     Returns:
         List[Dict[str, Optional[str]]]: Массив словарей с информацией о проектах НПА.
             Каждый словарь содержит поля:
             - title: название проекта
             - link: ссылка на проект
-            - guid: уникальный идентификатор
-            - description: описание проекта
+            - id: уникальный идентификатор
+            - meta: описание проекта
             - pub_date: дата публикации (строка)
-            - category: категория/департамент
 
     Raises:
         requests.RequestException: Ошибка при получении данных с сервера
@@ -236,20 +239,34 @@ def get_central_bank_draft_regulatory_acts() -> list[dict]:
         items = root.findall('.//item')
         draft_regulatory_acts_list = []
         for item in items:
+            pub_date = datetime.strptime(
+                    item.find('pubDate').text, 
+                    "%a, %d %b %Y %H:%M:%S %z"
+                ).replace(tzinfo=None)
+            
+            # так как документы идут от более молодых к старым, первый слишком старый будет означать,
+            # что и другие нам не интересны
+            if pub_date <= start_date:
+                break
+                
             title_element = item.find('title')
             link_element = item.find('link')
             guid_element = item.find('guid')
-            description_element = item.find('description')
-            pub_date_element = item.find('pubDate')
-            category_element = item.find('category')
+            doc_info = ""
+            try:
+                pdf_url = f"https://www.cbr.ru/Queries/XsltBlock/File/90538/{guid_element.text.split("_")[1]}/note"
+            except (ValueError, TypeError) as url_err:
+                logger.error(f"Ошибка во время составления ссылки на PDF: {url_err}")
+            else:
+                doc_info = extract_pdf_full_text_advanced(pdf_url)
+            
 
             draft_regulatory_act_info = {
                 'title': title_element.text if title_element is not None else None,
                 'link': link_element.text if link_element is not None else None,
-                'guid': guid_element.text if guid_element is not None else None,
-                'description': description_element.text if description_element is not None else None,
-                'pub_date': pub_date_element.text if pub_date_element is not None else None,
-                'category': category_element.text if category_element is not None else None,
+                'id': guid_element.text,
+                'meta': drop_uwanted_symbols(doc_info),
+                'pub_date': pub_date.date().isoformat()
             }
 
             draft_regulatory_acts_list.append(draft_regulatory_act_info)
@@ -262,7 +279,6 @@ def get_central_bank_draft_regulatory_acts() -> list[dict]:
         print(f"Ошибка при парсинге XML: {parse_error}")
     except Exception as e_other:
         print(f"Иная ошибка: {e_other}")
-
 
 
 def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
@@ -294,6 +310,7 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
         params["page"] = current_page_number
 
         try:
+            logger.info(f"Отправка запроса на {base_url} с параметрами {params}")
             response = requests.get(base_url, params=params, timeout=10)
             response.raise_for_status()
 
@@ -306,7 +323,8 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
             for news_item in json_data:
                 # Парсим дату публикации
                 publication_datetime = datetime.fromisoformat(news_item["DT"].replace("Z", "+00:00"))
-
+                
+                
                 # Если дата новости старше start_date, прекращаем сбор
                 if publication_datetime.date() < start_date.date():
                     should_continue_pagination = False
@@ -319,22 +337,34 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
                 else:
                     article_link = f"https://cbr.ru/press/event/?id={article_id}"
 
-                # Формируем meta строку (можно включить дополнительную информацию)
-                meta_parts = []
-                if news_item.get("Important"):
-                    meta_parts.append("Важное")
-                if news_item.get("Video"):
-                    meta_parts.append("Видео")
-                meta_string = ", ".join(meta_parts) if meta_parts else ""
+                info_string = ""
+                try:
+                    news_response = requests.get(url=article_link)
+
+                    if news_response.status_code == 200:
+                        news_tree = html.fromstring(news_response.text)
+                        paragraphs = news_tree.xpath('//div[@class="landing-text"]/p')
+
+                        for p in paragraphs:
+                            info_string += " " + drop_uwanted_symbols(p.text_content())
+                            
+                except requests.RequestException as request_error:
+                    logger.error(f"Запрос на {article_link} не удался: {request_error}")
+                except (AttributeError, TypeError) as parsing_error:
+                    logger.error(f"Ошибка при парсинге HTML для {article_link}: {parsing_error}")
+                except Exception as other_error:
+                    logger.error(f"Неожиданная ошибка при обработке {article_link}: {other_error}")
 
                 # Добавляем в результат
                 collected_news_list.append({
                     "id": article_id,
-                    "title": drop_nbsp(news_item.get("name_doc", "")),
+                    "title": drop_uwanted_symbols(news_item.get("name_doc", "")),
                     "link": article_link,
-                    "meta": meta_string,
+                    "meta": info_string,
                     "pub_date": publication_datetime.strftime("%Y-%m-%d")
                 })
+
+                time.sleep(0.3)
 
             # Переходим к следующей странице
             current_page_number += 1

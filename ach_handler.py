@@ -34,7 +34,7 @@ def get_ach_latest_docs(start_date: datetime) -> list[dict]:
         logger.error("Локаль 'ru_RU.UTF-8' не найдена. Установите ее в вашей системе.")
         logger.warning("Попытка продолжить с системной локалью, но разбор дат может быть некорректным.")
 
-    # Параметры запроса, как вы и указали
+    # Параметры запроса
     api_url = "https://ach.gov.ru/api/v1/controls/list?count=10&page="
     request_headers = {
         'Accept': 'application/json, text/plain, */*',

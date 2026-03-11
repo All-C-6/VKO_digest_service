@@ -3,6 +3,10 @@ from pathlib import Path
 import inspect
 import pandas as pd
 import logging
+import requests
+import pdfplumber
+from io import BytesIO
+
 
 def setup_logging(log_to: list = ["file"], log_file_path: str = None, level="INFO", logger_name: str = None):
     """
@@ -74,14 +78,14 @@ def setup_logging(log_to: list = ["file"], log_file_path: str = None, level="INF
     return logger
 
 
-def drop_nbsp(text: str) -> str:
+def drop_uwanted_symbols(text: str) -> str:
     """
     Функция для удаления неразрывных пробелов из текста
     
     :param text (str): текст для очистки от неразрывных пробелов
     :return (str): текст после очистки
     """
-    return text.replace('\xa0', ' ')
+    return text.replace('\xa0', ' ').replace('\n', ' ')
 
 
 def save_list_dict_to_excel(
@@ -164,3 +168,45 @@ def save_list_dict_to_excel(
         error_message = f"Неожиданная ошибка при сохранении в Excel: {unexpected_error}"
         logging.error(error_message)
         return False
+
+
+def extract_pdf_full_text_advanced(pdf_url: str) -> str:
+    """
+    Извлекает весь текст из PDF файла по указанной ссылке с использованием pdfplumber.
+
+    Args:
+        pdf_url (str): URL ссылка на PDF файл
+
+    Returns:
+        Optional[str]: Извлеченный текст из PDF или None в случае ошибки
+    """
+    try:
+        # Скачиваем PDF файл
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        response = requests.get(pdf_url, headers=headers, timeout=30)
+        response.raise_for_status()
+
+        # Создаем объект BytesIO из загруженного содержимого
+        pdf_bytes_io = BytesIO(response.content)
+
+        extracted_complete_text = ""
+
+        # Используем pdfplumber для более качественного извлечения текста
+        with pdfplumber.open(pdf_bytes_io) as pdf_document:
+            for page_index, current_page in enumerate(pdf_document.pages):
+                page_text_content = current_page.extract_text()
+                if page_text_content:
+                    extracted_complete_text += page_text_content + "\n"
+
+        return extracted_complete_text.strip()
+
+    except requests.exceptions.RequestException as request_error:
+        print(f"Ошибка при загрузке PDF файла: {request_error}")
+        return ""
+
+    except Exception as general_exception:
+        print(f"Ошибка при обработке PDF {pdf_url}: {general_exception}")
+        return ""

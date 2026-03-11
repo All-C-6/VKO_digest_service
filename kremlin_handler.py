@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import time
 
-from utils import setup_logging, drop_nbsp
+from utils import setup_logging, drop_uwanted_symbols
 
 
 logger = logging.getLogger(__name__)
@@ -310,11 +310,11 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
 
     # Поиск дополнительной мета-информации
     meta_acts_element = link_element.find('span', class_='hentry__meta_acts')
-    document_meta = drop_nbsp(meta_acts_element.get_text(strip=True)) if meta_acts_element else ""
+    document_meta = drop_uwanted_symbols(meta_acts_element.get_text(strip=True)) if meta_acts_element else ""
 
     # Поиск даты публикации
     time_element = link_element.find('time')
-    document_date = drop_nbsp(time_element.get_text(strip=True)) if time_element else ""
+    document_date = drop_uwanted_symbols(time_element.get_text(strip=True)) if time_element else ""
     document_datetime = datetime.strptime(time_element.get('datetime'), "%Y-%m-%d").date().strftime("%Y-%m-%d") if time_element else ""
 
     # Формирование полного URL
@@ -324,9 +324,9 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
     # Очистка заголовка от мета-информации и даты
     clean_document_title = document_title
     if document_meta:
-        clean_document_title = drop_nbsp(clean_document_title.replace(document_meta, '').strip())
+        clean_document_title = drop_uwanted_symbols(clean_document_title.replace(document_meta, '').strip())
     if document_date:
-        clean_document_title = drop_nbsp(clean_document_title.replace(document_date, '').strip())
+        clean_document_title = drop_uwanted_symbols(clean_document_title.replace(document_date, '').strip())
 
     return {
         "id": document_href.split("/")[-1],
