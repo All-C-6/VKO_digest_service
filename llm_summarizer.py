@@ -102,3 +102,23 @@ def extract_items_from_llm_answer(answer: str) -> set[str]:
 
     found_identifiers = {match.group(1) for match in pattern.finditer(answer)}
     return found_identifiers
+
+
+def filter_valid_news_and_docs(data: list[dict], filtered_IDs: set[str]) -> list[dict]:
+    """
+    Фильтрует данные согласно выделенным из ответа LLM идентификаторам
+
+    Args:
+        data: данные из парсеров (полный список словарей с интересующим нас ключом 'id')
+        filtered_IDs: набор идентификаторов, извлеченных из ответа LLM
+    
+    Returns:
+        Список новостей и документов, для которых совпали идентификаторы
+    
+    """
+
+    # простое итерирование и сравнение
+
+    valid_data = [item for item in data if item['id'] in filtered_IDs]
+
+    return valid_data

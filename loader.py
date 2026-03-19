@@ -5,9 +5,11 @@
 import json
 from datetime import datetime, timedelta
 
+import yaml
+
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
 from cbr_handler import get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
-from llm_summarizer import get_list_summary, extract_items_from_llm_answer
+from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer
 from roskazna_handler import get_latest_roskazna_docs
 from ach_handler import get_latest_ach_docs
 from utils import setup_logging, save_list_dict_to_excel, convert_data_to_md, convert_data_to_yaml
@@ -57,3 +59,10 @@ if __name__ == "__main__":
     id_set = extract_items_from_llm_answer(answer)
     print(id_set)
     
+    with open('all_docs.yaml', 'r', encoding='utf-8') as file:
+        # Загружаем данные с помощью safe_load
+        data = yaml.safe_load(file)
+
+    valid_docs_and_news = filter_valid_news_and_docs(data, id_set)
+    
+    print([item["title"] for item in valid_docs_and_news])
