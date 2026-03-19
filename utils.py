@@ -6,7 +6,7 @@ import logging
 import requests
 import pdfplumber
 from io import BytesIO
-
+import yaml
 
 def setup_logging(log_to: list = ["file"], log_file_path: str = None, level="INFO", logger_name: str = None):
     """
@@ -76,6 +76,10 @@ def setup_logging(log_to: list = ["file"], log_file_path: str = None, level="INF
     logger.propagate = False
 
     return logger
+
+
+logger = logging.getLogger(__name__)
+setup_logging("logs/utils.log", level="INFO")
 
 
 def drop_uwanted_symbols(text: str) -> str:
@@ -164,11 +168,6 @@ def save_list_dict_to_excel(
         logging.error(error_message)
         raise FileNotFoundError(error_message)
 
-    except Exception as unexpected_error:
-        error_message = f"Неожиданная ошибка при сохранении в Excel: {unexpected_error}"
-        logging.error(error_message)
-        return False
-
 
 def extract_pdf_full_text_advanced(pdf_url: str) -> str:
     """
@@ -204,9 +203,88 @@ def extract_pdf_full_text_advanced(pdf_url: str) -> str:
         return extracted_complete_text.strip()
 
     except requests.exceptions.RequestException as request_error:
-        print(f"Ошибка при загрузке PDF файла: {request_error}")
+        logger.error(f"Ошибка при загрузке PDF файла: {request_error}")
         return ""
 
     except Exception as general_exception:
-        print(f"Ошибка при обработке PDF {pdf_url}: {general_exception}")
+        logger.error(f"Ошибка при обработке PDF {pdf_url}: {general_exception}")
         return ""
+
+
+def convert_data_to_md(data_list: list, filename: str = None) -> str:
+    """
+    Конвертирует список словарей в markdown-таблицу без выравнивания пробелами.
+
+    Args:
+        data_list: список словарей с одинаковыми ключами
+        filename:  имя файла для сохранения (опционально, с расширением .md или без)
+
+    Returns:
+        строка с markdown-таблицей
+    """
+    if not data_list:
+        raise ValueError("data_list не может быть пустым")
+
+    if not all(isinstance(item, dict) for item in data_list):
+        raise TypeError("Все элементы data_list должны быть словарями")
+
+    column_names = list(data_list[0].keys())
+
+    header_row    = "| " + " | ".join(str(column_name) for column_name in column_names) + " |"
+    separator_row = "| " + " | ".join("---" for _ in column_names) + " |"
+
+    data_rows = []
+    for item in data_list:
+        row_values   = (str(item.get(column_name, "")) for column_name in column_names)
+        data_row     = "| " + " | ".join(row_values) + " |"
+        data_rows.append(data_row)
+
+    markdown_table = "\n".join([header_row, separator_row] + data_rows)
+
+    if filename is not None:
+        output_path = Path(filename)
+        if output_path.suffix.lower() != ".md":
+            output_path = output_path.with_suffix(".md")
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(markdown_table, encoding="utf-8")
+        logger.info(f"Markdown-таблица сохранена в файл: {output_path.resolve()}")
+
+    return markdown_table
+
+
+def convert_data_to_yaml(data_list: list, filename: str = None) -> str:
+    """
+    Конвертирует список словарей в YAML-строку.
+
+    Args:
+        data_list: список словарей с одинаковыми ключами
+        filename:  имя файла для сохранения (опционально, с расширением .yaml или без)
+
+    Returns:
+        строка в формате YAML
+    """
+    if not data_list:
+        raise ValueError("data_list не может быть пустым")
+
+    if not all(isinstance(item, dict) for item in data_list):
+        raise TypeError("Все элементы data_list должны быть словарями")
+
+    yaml_string = yaml.dump(
+        data_list,
+        allow_unicode=True,       # корректный вывод кириллицы без экранирования
+        default_flow_style=False, # развёрнутый многострочный формат
+        sort_keys=False,          # сохранить порядок ключей как в исходнике
+        indent=2,                 # стандартный отступ
+    )
+
+    if filename is not None:
+        output_path = Path(filename)
+        if output_path.suffix.lower() not in (".yaml", ".yml"):
+            output_path = output_path.with_suffix(".yaml")
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(yaml_string, encoding="utf-8")
+        logger.info(f"YAML сохранён в файл: {output_path.resolve()}")
+
+    return yaml_string

@@ -5,6 +5,8 @@
 *.xlsx#
 *test*
 *.session
+*.md
+*.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

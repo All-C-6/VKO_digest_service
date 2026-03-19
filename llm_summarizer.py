@@ -1,0 +1,78 @@
+import yaml
+from pathlib import Path
+from openai import OpenAI
+
+
+def load_deepseek_settings(settings_file_path: str = "settings.yaml") -> dict:
+    """
+    Загружает конфигурацию DeepSeek из YAML-файла.
+
+    Args:
+        settings_file_path: Путь к файлу настроек.
+
+    Returns:
+        Словарь с настройками секции 'deepseek'.
+    """
+    yaml_file_path = Path(settings_file_path)
+
+    if not yaml_file_path.exists():
+        raise FileNotFoundError(f"Файл настроек не найден: {yaml_file_path.resolve()}")
+
+    with yaml_file_path.open(encoding="utf-8") as yaml_file:
+        all_settings = yaml.safe_load(yaml_file)
+
+    if "deepseek" not in all_settings:
+        raise KeyError("В файле настроек отсутствует секция 'deepseek'")
+
+    return all_settings["deepseek"]
+
+
+def get_list_summary(string_with_data: str, prompt: str, settings_file_path: str = "settings.yaml") -> str:
+    """
+    Отправляет запрос к DeepSeek API и возвращает саммари по переданным данным.
+
+    DeepSeek совместим с OpenAI SDK, поэтому используется openai.OpenAI клиент
+    с переопределённым base_url.
+
+    Args:
+        string_with_data: Строка с данными, которые нужно суммаризировать.
+        prompt: Инструкция или вопрос к модели относительно данных.
+        settings_file_path: Путь к YAML-файлу с настройками (по умолчанию "settings.yaml").
+
+    Returns:
+        Текстовый ответ языковой модели.
+
+    Raises:
+        FileNotFoundError: Если файл настроек не найден.
+        KeyError: Если в файле настроек отсутствует секция 'deepseek'.
+        openai.APIError: При ошибке на стороне API.
+    """
+    deepseek_settings = load_deepseek_settings(settings_file_path)
+
+    deepseek_client = OpenAI(
+        api_key=deepseek_settings["api_key"],
+        base_url=deepseek_settings["base_url"],
+    )
+
+    system_message = {
+        "role": "system",
+        "content": deepseek_settings["system_prompt"],
+    }
+
+    user_message_content = f"{prompt}\n\nДанные:\n{string_with_data}"
+    user_message = {
+        "role": "user",
+        "content": user_message_content,
+    }
+
+    chat_completion_response = deepseek_client.chat.completions.create(
+        model=deepseek_settings["model"],
+        messages=[system_message, user_message],
+        temperature=deepseek_settings["temperature"],
+        max_tokens=deepseek_settings["max_tokens"],
+    )
+
+    llm_response_text = chat_completion_response.choices[0].message.content
+    return llm_response_text
+
+
