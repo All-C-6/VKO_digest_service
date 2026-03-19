@@ -1,3 +1,5 @@
+import re
+
 import yaml
 from pathlib import Path
 from openai import OpenAI
@@ -76,3 +78,27 @@ def get_list_summary(string_with_data: str, prompt: str, settings_file_path: str
     return llm_response_text
 
 
+def extract_items_from_llm_answer(answer: str) -> set[str]:
+    """
+    Извлекает идентификаторы из ответа LLM.
+
+    Идентификатор — это последовательность цифр и латинских букв (a-z, A-Z, 0-9),
+    которой предшествует от 0 до 10 не-цифровых символов от начала строки.
+    Идентификатор заканчивается при появлении любого символа, не являющегося
+    цифрой или латинской буквой.
+
+    Args:
+        answer: Текст ответа LLM, в котором нужно найти идентификаторы.
+
+    Returns:
+        Множество найденных идентификаторов.
+    """
+    pattern = re.compile(
+        r"^[^\d]{0,10}"   # от 0 до 10 не-цифровых символов от начала строки
+        r"([A-Za-z0-9_-]+)" # идентификатор: цифры и латинские буквы
+        r"(?:[^A-Za-z0-9]|$)",  # конец идентификатора: не цифра/не лат. буква или конец строки
+        re.MULTILINE
+    )
+
+    found_identifiers = {match.group(1) for match in pattern.finditer(answer)}
+    return found_identifiers
