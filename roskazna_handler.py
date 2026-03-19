@@ -1,3 +1,7 @@
+"""
+Модуль предназначен для загрузки документов Федерального казначейства с официального сайта
+"""
+
 import requests
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
@@ -17,6 +21,9 @@ headers = {
 
 
 class TextExtractorHTMLParser(HTMLParser):
+    """
+    Мини-класс для удобства работы с HTML разметкой с сайта Фед. казначейства
+    """
     def __init__(self):
         super().__init__()
         self.extracted_text_parts = []

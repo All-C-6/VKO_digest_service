@@ -1,3 +1,7 @@
+"""
+Модуль предназначен для загрузки документов Счетной палаты РФ с официального сайта
+"""
+
 import requests
 import locale
 import logging
@@ -12,7 +16,7 @@ from utils import setup_logging
 logger =  logging.getLogger(__name__)
 setup_logging(log_file_path="logs/ach_handler.log", level="INFO")
 
-def get_ach_latest_docs(start_date: datetime) -> list[dict]:
+def get_latest_ach_docs(start_date: datetime) -> list[dict]:
     """
     Получает список последних проверок со сайта Счетной палаты (ach.gov.ru),
     фильтруя их по дате начала.
