@@ -329,7 +329,7 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
         clean_document_title = drop_uwanted_symbols(clean_document_title.replace(document_date, '').strip())
 
     return {
-        "id": document_href.split("/")[-1],
+        "id": document_href.split("/")[-1].split('.')[0],
         'title': clean_document_title,
         'meta': document_meta,
         'pub_date': document_datetime,

@@ -8,7 +8,7 @@ import pdfplumber
 from io import BytesIO
 import yaml
 
-def setup_logging(log_to: list = ["file"], log_file_path: str = None, level="INFO", logger_name: str = None):
+def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = None, log_to: list = ["file"]):
     """
     Установка логгирования для конкретного модуля
     Создает отдельный логгер с собственным файлом, не влияя на другие модули
@@ -253,6 +253,23 @@ def convert_data_to_md(data_list: list, filename: str = None) -> str:
     return markdown_table
 
 
+def save_yaml(filename: str, yaml_string_data: str):
+    """
+    Сохранение YAML данных в файл
+
+    Args:
+        filename: путь до файла (с расширением либо без)
+        yaml_string_data: данные, что нужно записать
+    """
+    output_path = Path(filename)
+    if output_path.suffix.lower() not in (".yaml", ".yml"):
+        output_path = output_path.with_suffix(".yaml")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(yaml_string_data, encoding="utf-8")
+    logger.info(f"YAML сохранён в файл: {output_path.resolve()}")
+
+
 def convert_data_to_yaml(data_list: list, filename: str = None) -> str:
     """
     Конвертирует список словарей в YAML-строку.
@@ -279,12 +296,6 @@ def convert_data_to_yaml(data_list: list, filename: str = None) -> str:
     )
 
     if filename is not None:
-        output_path = Path(filename)
-        if output_path.suffix.lower() not in (".yaml", ".yml"):
-            output_path = output_path.with_suffix(".yaml")
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(yaml_string, encoding="utf-8")
-        logger.info(f"YAML сохранён в файл: {output_path.resolve()}")
+        save_yaml(filename, yaml_string)
 
     return yaml_string

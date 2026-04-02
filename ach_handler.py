@@ -118,7 +118,7 @@ def get_latest_ach_docs(start_date: datetime) -> list[dict]:
                 cleaned_meta_text = BeautifulSoup(preview_html, "html.parser").get_text().strip()
 
                 document_details = {
-                    "id": document_item.get("ID"),
+                    "id": str(document_item.get("ID")),
                     "title": document_item.get("NAME"),
                     "meta": cleaned_meta_text,
                     "link": report_link,

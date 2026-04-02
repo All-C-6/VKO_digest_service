@@ -1,9 +1,14 @@
 import re
-
 import yaml
 from pathlib import Path
 from openai import OpenAI
+from logging import getLogger
 
+from utils import setup_logging
+
+
+logger = getLogger(__name__)
+setup_logging(log_file_path="logs/llm_summarizer.log", level="INFO")
 
 def load_deepseek_settings(settings_file_path: str = "settings.yaml") -> dict:
     """
@@ -18,12 +23,14 @@ def load_deepseek_settings(settings_file_path: str = "settings.yaml") -> dict:
     yaml_file_path = Path(settings_file_path)
 
     if not yaml_file_path.exists():
+        logger.error(f"Файл настроек не найден: {yaml_file_path.resolve()}")
         raise FileNotFoundError(f"Файл настроек не найден: {yaml_file_path.resolve()}")
 
     with yaml_file_path.open(encoding="utf-8") as yaml_file:
         all_settings = yaml.safe_load(yaml_file)
 
     if "deepseek" not in all_settings:
+        logger.error("В файле настроек отсутствует секция 'deepseek'")
         raise KeyError("В файле настроек отсутствует секция 'deepseek'")
 
     return all_settings["deepseek"]
@@ -101,24 +108,31 @@ def extract_items_from_llm_answer(answer: str) -> set[str]:
     )
 
     found_identifiers = {match.group(1) for match in pattern.finditer(answer)}
+
+    if not found_identifiers:
+        logger.error(f"Не удалось извлечь идентификаторы из ответа LLM. Проверьте формат вывода.")
+        raise ValueError(f"Не удалось извлечь идентификаторы из ответа LLM. Проверьте формат вывода.")
     return found_identifiers
 
 
 def filter_valid_news_and_docs(data: list[dict], filtered_IDs: set[str]) -> list[dict]:
     """
-    Фильтрует данные согласно выделенным из ответа LLM идентификаторам
+    Фильтрует список словарей по ключу 'id' на основании набора идентификаторов.
+
+    Сравнение выполняется через startswith, так как идентификатор в наборе
+    может быть усечённой версией полного id (без точки и суффикса после неё).
+    Например, 'DOC123' из набора совпадёт с 'DOC123.pdf' в данных.
 
     Args:
-        data: данные из парсеров (полный список словарей с интересующим нас ключом 'id')
-        filtered_IDs: набор идентификаторов, извлеченных из ответа LLM
-    
+        data: список словарей с ключом 'id'
+        filtered_IDs: набор идентификаторов для отбора
+
     Returns:
-        Список новостей и документов, для которых совпали идентификаторы
-    
+        отфильтрованный список словарей, чей 'id' начинается
+        с одного из идентификаторов из набора
     """
+    def item_id_matches_any_chosen_id(item: dict) -> bool:
+        item_id = item.get('id', '')
+        return any(item_id.startswith(chosen_id) for chosen_id in filtered_IDs)
 
-    # простое итерирование и сравнение
-
-    valid_data = [item for item in data if item['id'] in filtered_IDs]
-
-    return valid_data
+    return list(filter(item_id_matches_any_chosen_id, data))

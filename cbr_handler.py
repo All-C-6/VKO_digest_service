@@ -355,7 +355,7 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
 
                 # Добавляем в результат
                 collected_news_list.append({
-                    "id": article_id,
+                    "id": article_id.split('.')[0],
                     "title": drop_uwanted_symbols(news_item.get("name_doc", "")),
                     "link": article_link,
                     "meta": info_string,

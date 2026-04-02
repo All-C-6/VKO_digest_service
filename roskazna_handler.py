@@ -49,6 +49,7 @@ def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
 
     Returns:
         Список словарей с данными новостей, содержащих ключи:
+        - id: идентификатор новости
         - title: заголовок новости
         - link: ссылка на новость
         - meta: описание новости
