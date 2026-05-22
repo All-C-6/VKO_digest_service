@@ -1,3 +1,4 @@
+import io
 import logging
 from pathlib import Path
 import inspect
@@ -6,7 +7,9 @@ import logging
 import requests
 import pdfplumber
 from io import BytesIO
+import segno
 import yaml
+from PIL import Image
 
 def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = None, log_to: list = ["file"]):
     """
@@ -299,3 +302,79 @@ def convert_data_to_yaml(data_list: list, filename: str = None) -> str:
         save_yaml(filename, yaml_string)
 
     return yaml_string
+
+
+def get_elements_from_yaml(attr_name: str, yaml_file_path: str) -> dict:
+    """
+    Находит все значения по имени атрибута в YAML файле.
+
+    Args:
+        attr_name: имя атрибута для поиска
+        yaml_file_path: путь до YAML файла с данными
+
+    Returns:
+        Словарь с ключами вида "attr_name_1", "attr_name_2" и их значениями
+    """
+
+    def collect_values_recursively(node, collected_values: list) -> None:
+        """Рекурсивно обходит YAML-структуру и собирает значения по имени атрибута."""
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == attr_name:
+                    collected_values.append(value)
+                else:
+                    collect_values_recursively(value, collected_values)
+        elif isinstance(node, list):
+            for item in node:
+                collect_values_recursively(item, collected_values)
+
+    with open(yaml_file_path, "r", encoding="utf-8") as yaml_file:
+        yaml_content = yaml.safe_load(yaml_file)
+
+    collected_values = []
+    collect_values_recursively(yaml_content, collected_values)
+
+    result_dict = {
+        f"{attr_name}_{index}": value
+        for index, value in enumerate(collected_values, start=1)
+    }
+
+    return result_dict
+
+
+def generate_qr_code(
+    content: str,
+    output_file_path: str,
+    scale: int = 10,
+    dark_color: str = "#0A5B5F",
+    light_color: str = "#FFFFFF",
+) -> None:
+    """
+    Генерирует QR-код тёмно-синего цвета и сохраняет его в формате PNG.
+
+    Args:
+        content: содержимое QR-кода (ссылка)
+        output_file_path: путь для сохранения QR-кода
+        scale: масштаб изображения
+        dark_color: цвет тёмной области кода
+        light_color: цвет светлой области кода
+
+    Returns:
+        None, сохраняет QR-код в файл
+    """
+    qr_code = segno.make(content, error="H")
+
+    png_buffer = io.BytesIO()
+    qr_code.save(
+        png_buffer,
+        kind="png",
+        scale=scale,
+        dark=dark_color,
+        light=light_color,
+    )
+    png_buffer.seek(0)
+
+    qr_image = Image.open(png_buffer)
+    qr_image.save(output_file_path, format="PNG")
+
+    print(f"QR-код сохранён в: {output_file_path}")

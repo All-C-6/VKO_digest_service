@@ -5,6 +5,7 @@
 import json
 from datetime import datetime, timedelta
 from logging import getLogger
+import os
 import yaml
 
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
@@ -12,7 +13,7 @@ from cbr_handler import get_central_bank_draft_regulatory_acts, get_latest_cbr_d
 from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer
 from roskazna_handler import get_latest_roskazna_docs
 from ach_handler import get_latest_ach_docs
-from utils import setup_logging, save_list_dict_to_excel, convert_data_to_md, convert_data_to_yaml, save_yaml
+from utils import generate_qr_code, get_elements_from_yaml, setup_logging, save_list_dict_to_excel, convert_data_to_md, convert_data_to_yaml, save_yaml
 
 logger = getLogger(__name__)
 setup_logging(log_file_path="logs/loader.log", level="INFO")
@@ -33,10 +34,11 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
 
 
 if __name__ == "__main__":
-  
-    start = start_date=datetime.today() - timedelta(days=22)
-    end = start_date=datetime.today()
-    all_items = get_news_and_docs_by_timerange()
+    
+    qr_code_path = "qrs"
+    start = datetime.today() - timedelta(days=21)
+    end = datetime.today()
+    all_items = get_news_and_docs_by_timerange(start, end)
     save_list_dict_to_excel(all_items, f"all_items_{datetime.strftime(start, "%d.%m.%Y")}-{datetime.strftime(end, "%d.%m.%Y")}.xlsx")
 
     all_items_yaml_string = convert_data_to_yaml(all_items, "all_items")
@@ -44,7 +46,7 @@ if __name__ == "__main__":
 
     prompt = """
     Оцени, какие из этих новостей и документов жизненно необходимы для учета изменений в нормативных актах и действиях регуляторов в отношнии банков, а также важнейших макроэкономических обстоятельств. Учитывай только важные изменения.
-    Формат вывода: ID - заголовок новости/документа.
+    Формат вывода: ID - заголовок новости/документа. Выводи только гарантированно нужные документы.
 
     """
     summary_result = get_list_summary(
@@ -57,7 +59,14 @@ if __name__ == "__main__":
 
     id_set = extract_items_from_llm_answer(summary_result)
     
-    print(id_set)
+    logger.info(f"Идентификаторы интересующих новостей: {id_set}")
+
     filtered_items = filter_valid_news_and_docs(all_items, id_set)
     filtered_items_yaml_string = convert_data_to_yaml(filtered_items, "filtered_data.yaml")
+    links = get_elements_from_yaml("link", "filtered_data.yaml")
+
+    if not os.path.exists(qr_code_path):
+        os.makedirs(qr_code_path)
+    for key, link in links.items():
+        generate_qr_code(link, f"{qr_code_path}/{datetime.today().strftime("%Y-%m-%d")}_{key}.png")
 
