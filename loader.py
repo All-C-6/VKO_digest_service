@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timedelta
 from logging import getLogger
 import os
+from pathlib import Path
 import yaml
 
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
@@ -24,7 +25,7 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     # все функции возвращают данные в едином виде
     all_news_and_docs = []
 
-    all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
+    #all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_docs(start_date))
     all_news_and_docs.extend(get_latest_cbr_news(start_date))
     all_news_and_docs.extend(get_latest_roskazna_docs(start_date))
@@ -35,24 +36,32 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
 
 if __name__ == "__main__":
     
+    # параметры для загрузки и поиска
     qr_code_path = "qrs"
-    start = datetime.today() - timedelta(days=21)
+    prompt = """
+    Оцени, какие из этих новостей и документов жизненно необходимы для учета изменений в нормативных актах и действиях регуляторов в отношнии системообразующих крупных банков, а также важнейшие изменения в экономике.
+    Выводи только в формате: ID - заголовок новости/документа. 
+    
+    Выводи только гарантированно нужные документы без дополнений про то, что может быть полезно.
+    """
+    start = datetime.today() - timedelta(days=14)
     end = datetime.today()
-    all_items = get_news_and_docs_by_timerange(start, end)
-    save_list_dict_to_excel(all_items, f"all_items_{datetime.strftime(start, "%d.%m.%Y")}-{datetime.strftime(end, "%d.%m.%Y")}.xlsx")
 
+    # загрузка данных
+    logger.info(f"Идет загрузка новостей за период {start.strftime("%d.%m.%Y")} - {end.strftime("%d.%m.%Y")}")
+    all_items = get_news_and_docs_by_timerange(start, end)
+    logger.info(f"Загрузка завершена. Загружено {len(all_items)} новостей и документов.")
+
+    # конвертация данных в YAML
     all_items_yaml_string = convert_data_to_yaml(all_items, "all_items")
 
-
-    prompt = """
-    Оцени, какие из этих новостей и документов жизненно необходимы для учета изменений в нормативных актах и действиях регуляторов в отношнии банков, а также важнейших макроэкономических обстоятельств. Учитывай только важные изменения.
-    Формат вывода: ID - заголовок новости/документа. Выводи только гарантированно нужные документы.
-
-    """
+    # получение сводного описания
+    logger.info("Идет получение сводного описания...")
     summary_result = get_list_summary(
         string_with_data=all_items_yaml_string,
         prompt=prompt,
     )
+    logger.info("Получение сводного описания завершено.")
     
     with open("list_summary.md", 'w') as list_summary_file:
         list_summary_file.write(summary_result)
@@ -65,8 +74,26 @@ if __name__ == "__main__":
     filtered_items_yaml_string = convert_data_to_yaml(filtered_items, "filtered_data.yaml")
     links = get_elements_from_yaml("link", "filtered_data.yaml")
 
+    
+    # создание папки для сохранения QR-кодов
+    logger.info("Создание папки для сохранения QR-кодов...")
     if not os.path.exists(qr_code_path):
         os.makedirs(qr_code_path)
+
+    qr_code_path = Path(qr_code_path)
+    logger.info("Папка для QR-кодов создана.")
+    
+    # удаление старых QR-кодов
+    logger.info("Удаление старых QR-кодов...")
+    for file in qr_code_path.iterdir():
+        if file.is_file():
+            file.unlink()
+
+    logger.info("Удаление старых QR-кодов завершено.")
+
+    # создание новых QR-кодов
+    logger.info("Создание новых QR-кодов...")
     for key, link in links.items():
         generate_qr_code(link, f"{qr_code_path}/{datetime.today().strftime("%Y-%m-%d")}_{key}.png")
+    logger.info(f"Создано {len(links)} QR-кодов.")
 
