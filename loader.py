@@ -16,8 +16,7 @@ from roskazna_handler import get_latest_roskazna_docs
 from ach_handler import get_latest_ach_docs
 from utils import generate_qr_code, get_elements_from_yaml, setup_logging, save_list_dict_to_excel, convert_data_to_md, convert_data_to_yaml, save_yaml
 
-logger = getLogger(__name__)
-setup_logging(log_file_path="logs/loader.log", level="INFO")
+logger = setup_logging(log_file_path="logs/loader.log", level="INFO")
 
 
 def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=14), end_date = datetime.today()) -> list[dict]:

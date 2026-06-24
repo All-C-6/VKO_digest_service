@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 import time
 
-from utils import setup_logging, drop_uwanted_symbols, extract_pdf_full_text_advanced
+from utils import setup_logging, drop_unwanted_symbols, extract_pdf_full_text_advanced
 
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/cbr_handler.log", level="INFO")
@@ -263,7 +263,7 @@ def get_central_bank_draft_regulatory_acts(start_date: datetime) -> list[dict]:
                 'title': title_element.text if title_element is not None else None,
                 'link': link_element.text if link_element is not None else None,
                 'id': guid_element.text,
-                'meta': drop_uwanted_symbols(doc_info),
+                'meta': drop_unwanted_symbols(doc_info),
                 'pub_date': pub_date.date().isoformat()
             }
 
@@ -344,7 +344,7 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
                         paragraphs = news_tree.xpath('//div[@class="landing-text"]/p')
 
                         for p in paragraphs:
-                            info_string += " " + drop_uwanted_symbols(p.text_content())
+                            info_string += " " + drop_unwanted_symbols(p.text_content())
                             
                 except requests.RequestException as request_error:
                     logger.error(f"Запрос на {article_link} не удался: {request_error}")
@@ -356,7 +356,7 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
                 # Добавляем в результат
                 collected_news_list.append({
                     "id": article_id.split('.')[0],
-                    "title": drop_uwanted_symbols(news_item.get("name_doc", "")),
+                    "title": drop_unwanted_symbols(news_item.get("name_doc", "")),
                     "link": article_link,
                     "meta": info_string,
                     "pub_date": publication_datetime.strftime("%Y-%m-%d")

@@ -2,6 +2,7 @@ import io
 import logging
 from pathlib import Path
 import inspect
+import re
 import pandas as pd
 import logging
 import requests
@@ -85,14 +86,18 @@ logger = logging.getLogger(__name__)
 setup_logging("logs/utils.log", level="INFO")
 
 
-def drop_uwanted_symbols(text: str) -> str:
-    """
-    Функция для удаления неразрывных пробелов из текста
-    
-    :param text (str): текст для очистки от неразрывных пробелов
-    :return (str): текст после очистки
-    """
-    return text.replace('\xa0', ' ').replace('\n', ' ')
+def drop_unwanted_symbols(text: str) -> str:
+    """Удаляет нежелательные символы из текста."""
+    text = text.replace('\xa0', ' ')   # неразрывный пробел
+    text = text.replace('\u200b', '')  # zero-width space
+    text = text.replace('\u00ad', '')  # мягкий перенос
+    text = text.replace('\r\n', '\n')
+    text = text.replace('\r', '\n')
+
+    # Убираем множественные пробелы (но не переносы строк)
+    text = re.sub(r' {2,}', ' ', text)
+    return text.strip()
+
 
 
 def save_list_dict_to_excel(

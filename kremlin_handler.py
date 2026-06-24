@@ -10,16 +10,131 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import time
 
-from utils import setup_logging, drop_uwanted_symbols
+from utils import drop_unwanted_symbols, setup_logging, drop_unwanted_symbols
 
 
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/kremlin_handler.log", level="INFO")
 
+
+exclude_keywords = {
+    # Военная тематика и ОПК
+    "военн",
+    "мобилизаци",
+    "сво",
+    "военнослужащ",
+    "оборона",
+    "атомный",
+    "боеприпасы",
+    "вооружение",
+    
+    # Внешняя политика, ратификации и дипломатия
+    "ратификаци",
+    "договор",
+    "посол",
+    "аэропорт",
+    "шанхайская организация сотрудничества",
+    "шос",
+    "евразийский экономический союз",
+    
+    # Кадровые назначения (не финансовые)
+    "судей",
+    "судья",
+    "губернатор",
+    "республик",
+    "края",
+    "край",
+    "помощник",
+    "награждение",
+    "присвоение имени",
+    
+    # Сельское хозяйство, рыболовство и природа
+    "рыболовство",
+    "водные",
+    "воздушные",
+    "воздушный",
+    "земельный",
+    "биологические",
+    "агропромышленный",
+    
+    # Транспорт и инфраструктура
+    "дороги",
+    "дорожн"
+    "воздушный кодекс",
+    "таможенн",
+    
+    # Социальная сфера, спорт и культура
+    "культура",
+    "культур",
+    "самбо",
+    "празднование",
+    "фонд перспективных исследований",
+    "премия в области науки и инноваций",
+    
+    # Строительство и недвижимость (общая)
+    "строительство",
+    "земельный кодекс",
+    "Особые экономические зоны",
+    "ОЭЗ",
+    
+    # Дополнительно (из вашего списка)
+    "организационный комитет",
+    "национальный совет",
+    "попечительский совет",
+    "бежен",
+    "переселен",
+    "свободная торговля",
+    "торговля услугами",
+    "охранная",
+    "лекарственных",
+    "игры",
+    "гражданств",
+    "призыв",
+}
+
+include_keywords = {
+    "займ",
+    "кредит",
+    "банк россии",
+    "Страхование",
+    "вклады",
+    "банк",
+    "мошенничес",
+    "денеж",
+    "наличн",
+    "легализаци"
+
+}
+def filter_kremlin_doc(doc_text: str) -> bool:
+    """
+    Фильтрует текст документа на предмет наличия ключевых слов из списка.
+
+    Args:
+        doc_text: Текст документа для фильтрации
+
+    Returns:
+        bool: True, если документ не содержит ключевые слова для удаления или содержит слова для сохранения, иначе False
+
+    """
+
+    # проверка на наличие ключевых слов для пропуска
+    if any(keyword in doc_text.lower() for keyword in exclude_keywords):
+        # если такие слова нашлтись, проверяем на наличие ключевых слов для сохранения
+        if any(keyword in doc_text.lower() for keyword in include_keywords):
+            # если такие слова нашлось, то документ сохраняем
+            return True
+        else:
+            # если слов для сохранения не нашлось, то пропускаем документ
+            return False
+    
+    # если ключевых слов для пропуска не нашлось, то сохраняем документ
+    else:
+        return True
+
 def get_webpage_as_xml_tree(
     url: str,
     cookie_sid: Optional[str] = None,
-    timeout_seconds: int = 30,
+    timeout_seconds: int = 5,
     verify_ssl: bool = True
 ) -> etree._Element:
     """
@@ -308,30 +423,76 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
     # Извлечение основного текста ссылки (заголовка документа)
     document_title = link_element.get_text(strip=True)
 
-    # Поиск дополнительной мета-информации
-    meta_acts_element = link_element.find('span', class_='hentry__meta_acts')
-    document_meta = drop_uwanted_symbols(meta_acts_element.get_text(strip=True)) if meta_acts_element else ""
+    # Очистка заголовка от мета-информации и даты
+    clean_document_title = document_title
+    if document_date:
+        clean_document_title = drop_unwanted_symbols(clean_document_title.replace(document_date, '').strip())
+
+    # фильтрация на предмет наличия ключевых слов 
+    # (определение, нужная ли это тематика)
+    if not filter_kremlin_doc(clean_document_title):
+        return None
 
     # Поиск даты публикации
     time_element = link_element.find('time')
-    document_date = drop_uwanted_symbols(time_element.get_text(strip=True)) if time_element else ""
+    document_date = drop_unwanted_symbols(time_element.get_text(strip=True)) if time_element else ""
     document_datetime = datetime.strptime(time_element.get('datetime'), "%Y-%m-%d").date().strftime("%Y-%m-%d") if time_element else ""
 
     # Формирование полного URL
     document_href = link_element.get('href')
     full_document_url = f"{kremlin_base_url}{document_href}"
 
-    # Очистка заголовка от мета-информации и даты
-    clean_document_title = document_title
-    if document_meta:
-        clean_document_title = drop_uwanted_symbols(clean_document_title.replace(document_meta, '').strip())
-    if document_date:
-        clean_document_title = drop_uwanted_symbols(clean_document_title.replace(document_date, '').strip())
+    # Формирование меты (описания)
+    time.sleep(1)
+    article = get_webpage_as_xml_tree(full_document_url)
+    if len(article) > 0:
+        article_text_meta = extract_text_from_kremlin_docpage(article)
+    else:
+        article_text_meta = ""
 
     return {
         "id": document_href.split("/")[-1].split('.')[0],
         'title': clean_document_title,
-        'meta': document_meta,
+        'meta': article_text_meta,
         'pub_date': document_datetime,
         'link': full_document_url
     }
+
+
+def extract_text_from_kremlin_docpage(lxml_page: etree._Element) -> str:
+    """
+    Находит div.reader_act_body на странице kremlin.ru и извлекает из него
+    форматированный текст с сохранением структуры абзацев и заголовков.
+
+    Args:
+        lxml_page: корневой элемент разобранной lxml страницы
+
+    Returns:
+        str: форматированный текст документа
+    """
+    reader_act_body_divs = lxml_page.xpath('.//div[contains(@class, "reader_act_body")]')
+    if not reader_act_body_divs:
+        raise ValueError("Элемент div.reader_act_body не найден на странице")
+
+    for reader_act_body_div in reader_act_body_divs:
+
+        extracted_lines = []
+
+        for child_element in reader_act_body_div:
+            
+            for para in child_element:
+                blank_line_count = 0
+                # Получаем весь текст элемента (включая текст вложенных тегов)
+                raw_element_text = ''.join(para.itertext())
+                cleaned_element_text = drop_unwanted_symbols(raw_element_text)
+
+
+                # Пустые абзацы (&nbsp; и т.п.) превращаются в пустую строку — пропускаем
+                if len(raw_element_text) < 3:
+                    continue
+
+                extracted_lines.append(cleaned_element_text)
+
+            document_text = '\n'.join(extracted_lines)
+
+    return document_text
