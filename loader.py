@@ -24,7 +24,7 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     # все функции возвращают данные в едином виде
     all_news_and_docs = []
 
-    #all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
+    all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_docs(start_date))
     all_news_and_docs.extend(get_latest_cbr_news(start_date))
     all_news_and_docs.extend(get_latest_roskazna_docs(start_date))
