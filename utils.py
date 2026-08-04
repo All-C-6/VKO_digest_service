@@ -3,6 +3,8 @@ import logging
 from pathlib import Path
 import inspect
 import re
+import socket
+import ssl
 import pandas as pd
 import logging
 import requests
@@ -383,3 +385,55 @@ def generate_qr_code(
     qr_image.save(output_file_path, format="PNG")
 
     print(f"QR-код сохранён в: {output_file_path}")
+
+
+def save_valid_sert(host="roskazna.gov.ru") -> str:
+    """
+    Загружает валидный сертификат для указанного сайта
+    
+    Args:
+       host (str): доменное имя хоста, с которого нужно получить SSL сертификат
+    
+    Returns: 
+        cert (str): имя сертификата
+    """
+
+    port = 443
+
+    # Отключаем валидацию только ради того, чтобы скачать сами сертификаты
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+
+    logger.info(f"Подключение к {host}...")
+    with socket.create_connection((host, port)) as sock:
+        with context.wrap_socket(sock, server_hostname=host) as ssock:
+            try:
+                # Получаем цепочку объектов _ssl.Certificate (Python 3.13+)
+                ssl_certs = ssock._sslobj.get_unverified_chain()
+            except AttributeError:
+                logger.warning(f"Fallbak на старую версию получения")
+                # Резервный вариант для более старых версий Python (< 3.13)
+                ssl_certs = [ssock.getpeercert(binary_form=True)]
+
+    bundle_filename = "roskazna_bundle.pem"
+    with open(bundle_filename, "w", encoding="utf-8") as f:
+        for cert in ssl_certs:
+            # Случай 1: Python 3.13 (объекты нового класса _ssl.Certificate)
+            if hasattr(cert, 'public_bytes'):
+                res = cert.public_bytes()
+                # Если public_bytes() вернул строку, пишем как есть. Если байты — декодируем.
+                pem_text = res if isinstance(res, str) else res.decode('utf-8')
+                
+            # Случай 2: Старые версии Python (возвращают чистые байты в формате DER)
+            else:
+                pem_text = ssl.DER_cert_to_PEM_cert(cert)
+                
+            # Записываем в итоговый бандл
+            f.write(pem_text)
+            if not pem_text.endswith('\n'):
+                f.write('\n')
+
+    logger.info(f"Успешно! Файл '{bundle_filename}' создан.")
+
+    return bundle_filename

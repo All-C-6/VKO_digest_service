@@ -1,7 +1,8 @@
 """
 Модуль предназначен для загрузки документов Федерального казначейства с официального сайта
 """
-
+import ssl
+from requests.adapters import HTTPAdapter
 import requests
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
@@ -14,9 +15,11 @@ from utils import setup_logging
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/roskazna_handler.log", level="INFO")
 
-CERT_BUNDLE_PATH = "/home/all-c/Документы/Dophamine/Python/VKO_sources_service/min_digi_gov.crt"
+CERT_BUNDLE_PATH = "./roskazna_bundle.pem"
+
+roskazna_rss_url = 'https://roskazna.gov.ru'
 headers = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
 
 
@@ -37,6 +40,19 @@ class TextExtractorHTMLParser(HTMLParser):
     def get_concatenated_text(self) -> str:
         """Возвращает весь извлеченный текст, объединенный пробелами"""
         return ' '.join(self.extracted_text_parts)
+
+
+# 1. Создаем кастомный SSL-адаптер
+class CustomSSLAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        # Создаем стандартный контекст SSL
+        context = ssl.create_default_context()
+        # Принудительно загружаем наш рабочий бандл Минцифры в контекст
+        context.load_verify_locations(cafile=CERT_BUNDLE_PATH)
+        
+        # Передаем настроенный контекст в менеджер пулов
+        kwargs['ssl_context'] = context
+        return super(CustomSSLAdapter, self).init_poolmanager(*args, **kwargs)
 
 
 def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
@@ -63,7 +79,25 @@ def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
         logger.info(f"Запрос RSS-ленты с {roskazna_rss_url}")
 
         # Выполняем HTTP-запрос для получения XML
-        http_response = requests.get(roskazna_rss_url, timeout=30, verify=False, headers=headers)
+        session = requests.Session()
+        # Монтируем адаптер для всех сайтов, начинающихся с https://
+        session.mount('https://', CustomSSLAdapter())
+
+        try:
+            # Важно: внутри session.get параметр verify указывать НЕ нужно (он уже внутри контекста), 
+            # либо укажите verify=True. Главное — не передавать туда путь строкой.
+            http_response = session.get(roskazna_rss_url, timeout=30, headers=headers)
+            
+            logger.debug(f"Статус ответа: {http_response.status_code}")
+            if http_response.status_code == 200:
+                logger.debug("Данные RSS успешно получены!")
+                # Ваш код парсинга данных (http_response.text)
+                
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Ошибка соединения (сброс): {e}")
+        except requests.exceptions.SSLError as e:
+            logger.error(f"Ошибка SSL: {e}")
+
         http_response.raise_for_status()
         http_response.encoding = 'utf-8'
 

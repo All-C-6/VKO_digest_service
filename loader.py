@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from logging import getLogger
 import os
 from pathlib import Path
+import requests
 import yaml
 
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
@@ -14,12 +15,22 @@ from cbr_handler import get_central_bank_draft_regulatory_acts, get_latest_cbr_d
 from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer
 from roskazna_handler import get_latest_roskazna_docs
 from ach_handler import get_latest_ach_docs
-from utils import generate_qr_code, get_elements_from_yaml, setup_logging, save_list_dict_to_excel, convert_data_to_md, convert_data_to_yaml, save_yaml
+from utils import generate_qr_code, get_elements_from_yaml, save_valid_sert, setup_logging, save_list_dict_to_excel, convert_data_to_md, convert_data_to_yaml, save_yaml
 
 logger = setup_logging(log_file_path="logs/loader.log", level="INFO")
 
 
 def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=14), end_date = datetime.today()) -> list[dict]:
+    """
+    Получение всех последних данных из разных источников
+    """
+
+    # проверка доступности сайтов
+    try:
+        get_latest_roskazna_docs(datetime.today() - timedelta(days=1))
+    except requests.exceptions.SSLError as ssl_error:
+        logger.warning(f"Не совпал SSL сертификат для roskazna.gov.ru: {ssl_error}")
+        save_valid_sert()
 
     # все функции возвращают данные в едином виде
     all_news_and_docs = []
