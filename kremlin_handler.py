@@ -168,7 +168,7 @@ def filter_kremlin_doc(doc_text: str) -> bool:
     
     # если ключевых слов для пропуска не нашлось, то сохраняем документ
     else:
-        print("Совпадений не найдено")
+        logger.debug("Совпадений в словах для исключения в документе АП не найдено")
         return True
 
 def get_webpage_as_xml_tree(

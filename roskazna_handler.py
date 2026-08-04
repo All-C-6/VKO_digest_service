@@ -14,7 +14,7 @@ from utils import setup_logging
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/roskazna_handler.log", level="INFO")
 
-CERT_BUNDLE_PATH = './digi-min.pem'
+CERT_BUNDLE_PATH = "/home/all-c/Документы/Dophamine/Python/VKO_sources_service/min_digi_gov.crt"
 headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
 }
@@ -63,7 +63,7 @@ def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
         logger.info(f"Запрос RSS-ленты с {roskazna_rss_url}")
 
         # Выполняем HTTP-запрос для получения XML
-        http_response = requests.get(roskazna_rss_url, timeout=30, verify=CERT_BUNDLE_PATH, headers=headers)
+        http_response = requests.get(roskazna_rss_url, timeout=30, verify=False, headers=headers)
         http_response.raise_for_status()
         http_response.encoding = 'utf-8'
 
