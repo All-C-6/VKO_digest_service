@@ -7,23 +7,33 @@ from datetime import datetime, timedelta
 from logging import getLogger
 import os
 from pathlib import Path
+from datetime import datetime, timezone
+from telethon import TelegramClient
 import requests
 import yaml
+from dotenv import load_dotenv
 
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
 from cbr_handler import get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
 from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer
 from roskazna_handler import get_latest_roskazna_docs
 from ach_handler import get_latest_ach_docs
+from tg_handler import get_channel_posts_by_dates
 from utils import generate_qr_code, get_elements_from_yaml, save_valid_sert, setup_logging, save_list_dict_to_excel, convert_data_to_md, convert_data_to_yaml, save_yaml
 
 logger = setup_logging(log_file_path="logs/loader.log", level="INFO")
+load_dotenv()
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+CB_USERNAME = os.getenv("CB_USERNAME")
 
 
 def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=14), end_date = datetime.today()) -> list[dict]:
     """
     Получение всех последних данных из разных источников
     """
+    start = datetime(2026, 9, 20, 0, 0, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
 
     # проверка доступности сайтов
     try:
@@ -37,7 +47,30 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
 
     all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_docs(start_date))
-    all_news_and_docs.extend(get_latest_cbr_news(start_date))
+    all_news_and_docs.extend(get_(start_date))
+        # start() у Telethon работает синхронно
+    
+    try:
+        # Инициализируем клиент
+        client = TelegramClient("session_name", API_ID, API_HASH)
+        client.start()
+        # Запускаем корутину внутри loop клиента
+        posts = client.loop.run_until_complete(
+            get_channel_posts_by_dates(client, CB_USERNAME, start, end)
+        )
+
+        print(f"Получено постов: {len(posts)}")
+
+    except Exception as e:
+        logger.error(f"Ошибка обращения к Telegram: {e}")
+
+    else:
+        all_news_and_docs.extend()
+
+    finally:
+        # Обязательно корректно закрываем сессию
+        client.disconnect()
+    all_news_and_docs.extend(get_channel_posts_by_dates(start_date))
     all_news_and_docs.extend(get_latest_roskazna_docs(start_date))
     all_news_and_docs.extend(get_latest_ach_docs(start_date))
 
