@@ -32,8 +32,6 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     """
     Получение всех последних данных из разных источников
     """
-    start = datetime(2026, 9, 20, 0, 0, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
 
     # проверка доступности сайтов
     try:
@@ -47,30 +45,10 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
 
     all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_docs(start_date))
-    all_news_and_docs.extend(get_(start_date))
+    all_news_and_docs.extend(get_latest_cbr_news(start_date))
         # start() у Telethon работает синхронно
     
-    try:
-        # Инициализируем клиент
-        client = TelegramClient("session_name", API_ID, API_HASH)
-        client.start()
-        # Запускаем корутину внутри loop клиента
-        posts = client.loop.run_until_complete(
-            get_channel_posts_by_dates(client, CB_USERNAME, start, end)
-        )
 
-        print(f"Получено постов: {len(posts)}")
-
-    except Exception as e:
-        logger.error(f"Ошибка обращения к Telegram: {e}")
-
-    else:
-        all_news_and_docs.extend()
-
-    finally:
-        # Обязательно корректно закрываем сессию
-        client.disconnect()
-    all_news_and_docs.extend(get_channel_posts_by_dates(start_date))
     all_news_and_docs.extend(get_latest_roskazna_docs(start_date))
     all_news_and_docs.extend(get_latest_ach_docs(start_date))
 

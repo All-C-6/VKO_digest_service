@@ -8,8 +8,10 @@ from telethon.tl.types import (
     MessageEntityUrl,
 )
 
-URL_REGEX = re.compile(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
+from utils import setup_logging
 
+URL_REGEX = re.compile(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
+logger = setup_logging(log_file_path="logs/tg_handler.log", level="INFO")
 
 def extract_links(message) -> List[str]:
     """Извлекает все типы ссылок: открытые URL и зашитые в текст гиперссылки."""
@@ -68,6 +70,7 @@ async def get_channel_posts_by_dates(
 
         post_data = {
             "id": message.id,
+            "link": f"https://t.me/{channel}/{message.id}", 
             "date": message.date.isoformat(),
             "text": message.text or "",  # Полный текст сообщения
             "views": message.views,
@@ -75,9 +78,44 @@ async def get_channel_posts_by_dates(
             "replies": message.replies.replies if message.replies else 0,
             "has_media": bool(message.media),
             "media_type": type(message.media).__name__ if message.media else None,
-            "links": extract_links(message),  # Вложенный список ссылок
+            "attached_links": extract_links(message),  # Вложенный список ссылок
         }
         posts.append(post_data)
 
+
+
     posts.reverse()
     return posts
+
+def get_latest_cbr_posts(start_date, end_date, CB_USERNAME, API_ID, API_HASH):
+
+    try:
+        # Инициализируем клиент
+        client = TelegramClient("session_name", API_ID, API_HASH)
+        client.start()
+        # Запускаем корутину внутри loop клиента
+        posts = client.loop.run_until_complete(
+            get_channel_posts_by_dates(client, CB_USERNAME, start_date, end_date)
+        )
+        """
+        document_info = {
+            'id': document_guid.text.strip(),
+            'title': document_title.text.strip(),
+            'link': document_link.text.strip(),
+            'meta': document_description.text.strip() if document_description is not None else '',
+            'pub_date': parsed_publication_datetime.isoformat()
+        }
+        """
+        logger.debug(f"Получено постов: {len(posts)}")
+
+    except Exception as e:
+        logger.error(f"Ошибка обращения к Telegram: {e}")
+        return []
+
+    else:
+
+        return posts
+
+    finally:
+        # Обязательно корректно закрываем сессию
+        client.disconnect()

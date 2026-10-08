@@ -14,6 +14,7 @@ import segno
 import yaml
 from PIL import Image
 
+
 def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = None, log_to: list = ["file"]):
     """
     Установка логгирования для конкретного модуля
