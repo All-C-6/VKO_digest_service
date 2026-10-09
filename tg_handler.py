@@ -80,12 +80,47 @@ async def get_channel_posts_by_dates(
             "media_type": type(message.media).__name__ if message.media else None,
             "attached_links": extract_links(message),  # Вложенный список ссылок
         }
-        posts.append(post_data)
+        posts.append(format_tg_post(post_data))
 
 
 
     posts.reverse()
     return posts
+
+
+def remove_markdown_links(text: str) -> str:
+    # Шаблон находит [анкор](url)
+    # \[([^\]]+)\] захватывает текст внутри скобок
+    # \([^\)]+\) сопоставляется со ссылкой внутри круглых скобок
+    pattern = r'\[([^\]]+)\]\([^\)]+\)'
+    
+    # Заменяем всю конструкцию на содержимое первой группы (\1)
+    return re.sub(pattern, r'\1', text)
+
+
+def format_tg_post(post: dict) -> dict:
+    """
+    document_info = {
+        'id': document_guid.text.strip(),
+        'title': document_title.text.strip(),
+        'link': document_link.text.strip(),
+        'meta': document_description.text.strip() if document_description is not None else '',
+        'pub_date': parsed_publication_datetime.isoformat()
+    }
+    """
+    text = post['text']
+    formatted_text = remove_markdown_links(text)
+    formatted_date = datetime.fromisoformat(post["date"]).strftime("%Y-%m-%d")
+    title = ""
+    if "\n" in text:
+        title = text.split("\n")[0]
+    elif re.search(". [А-Я]", text):
+        title = re.split(". [А-Я]")[0]
+    
+    return {"id": str(post["id"]), "title": title, "link": post["link"], "meta": formatted_text, "pub_date": formatted_date}
+
+
+
 
 def get_latest_cbr_posts(start_date, end_date, CB_USERNAME, API_ID, API_HASH):
 
@@ -113,7 +148,6 @@ def get_latest_cbr_posts(start_date, end_date, CB_USERNAME, API_ID, API_HASH):
         return []
 
     else:
-
         return posts
 
     finally:
