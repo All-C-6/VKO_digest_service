@@ -6,15 +6,25 @@ from telethon import TelegramClient
 from telethon.tl.types import (
     MessageEntityTextUrl,
     MessageEntityUrl,
+    Message
 )
 
-from utils import setup_logging
+from utils import drop_unwanted_symbols, setup_logging
 
 URL_REGEX = re.compile(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
 logger = setup_logging(log_file_path="logs/tg_handler.log", level="INFO")
 
-def extract_links(message) -> List[str]:
-    """Извлекает все типы ссылок: открытые URL и зашитые в текст гиперссылки."""
+
+def extract_links(message: Message) -> List[str]:
+    """
+    Извлекает все типы ссылок: открытые URL и зашитые в текст гиперссылки.
+
+    Args:
+        message: объект типа `Message` от библиотеки telethon
+
+    Returns:
+        list(str): список строковых представлений найденных URLs
+    """
     links = set()
     text = message.text or ""
 
@@ -109,7 +119,7 @@ def format_tg_post(post: dict) -> dict:
     }
     """
     text = post['text']
-    formatted_text = remove_markdown_links(text)
+    formatted_text = remove_markdown_links(drop_unwanted_symbols(text))
     formatted_date = datetime.fromisoformat(post["date"]).strftime("%Y-%m-%d")
     title = ""
     if "\n" in text:

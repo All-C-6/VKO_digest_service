@@ -10,33 +10,8 @@ from utils import setup_logging
 logger = getLogger(__name__)
 setup_logging(log_file_path="logs/llm_summarizer.log", level="INFO")
 
-def load_deepseek_settings(settings_file_path: str = "settings.yaml") -> dict:
-    """
-    Загружает конфигурацию DeepSeek из YAML-файла.
 
-    Args:
-        settings_file_path: Путь к файлу настроек.
-
-    Returns:
-        Словарь с настройками секции 'deepseek'.
-    """
-    yaml_file_path = Path(settings_file_path)
-
-    if not yaml_file_path.exists():
-        logger.error(f"Файл настроек не найден: {yaml_file_path.resolve()}")
-        raise FileNotFoundError(f"Файл настроек не найден: {yaml_file_path.resolve()}")
-
-    with yaml_file_path.open(encoding="utf-8") as yaml_file:
-        all_settings = yaml.safe_load(yaml_file)
-
-    if "deepseek" not in all_settings:
-        logger.error("В файле настроек отсутствует секция 'deepseek'")
-        raise KeyError("В файле настроек отсутствует секция 'deepseek'")
-
-    return all_settings["deepseek"]
-
-
-def get_list_summary(string_with_data: str, prompt: str, settings_file_path: str = "settings.yaml") -> str:
+def get_list_summary(string_with_data: str, prompt: str, deepseek_settings: dict) -> str:
     """
     Отправляет запрос к DeepSeek API и возвращает саммари по переданным данным.
 
@@ -46,7 +21,7 @@ def get_list_summary(string_with_data: str, prompt: str, settings_file_path: str
     Args:
         string_with_data: Строка с данными, которые нужно суммаризировать.
         prompt: Инструкция или вопрос к модели относительно данных.
-        settings_file_path: Путь к YAML-файлу с настройками (по умолчанию "settings.yaml").
+        deepseek_settings: настройки DeepSeek (пути, параметры генерации)
 
     Returns:
         Текстовый ответ языковой модели.
@@ -56,7 +31,6 @@ def get_list_summary(string_with_data: str, prompt: str, settings_file_path: str
         KeyError: Если в файле настроек отсутствует секция 'deepseek'.
         openai.APIError: При ошибке на стороне API.
     """
-    deepseek_settings = load_deepseek_settings(settings_file_path)
 
     deepseek_client = OpenAI(
         api_key=deepseek_settings["api_key"],
@@ -140,8 +114,8 @@ def filter_valid_news_and_docs(data: list[dict], filtered_IDs: set[str]) -> list
 
 def summarize_single_news(
     news_item: dict[str],
-    custom_instruction: str = "",
-    settings_file_path: str = "settings.yaml",
+    deepseek_settings: dict,
+    custom_instruction: str = ""
 ) -> str:
     """Генерирует краткое саммари (строго в один абзац) для одной новости/документа.
 
@@ -158,7 +132,6 @@ def summarize_single_news(
         KeyError: Если в настройках отсутствует секция 'deepseek'.
         openai.APIError: При ошибке обращения к DeepSeek API.
     """
-    deepseek_settings = load_deepseek_settings(settings_file_path)
 
     deepseek_client = OpenAI(
         api_key=deepseek_settings["api_key"],

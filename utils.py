@@ -89,6 +89,28 @@ logger = logging.getLogger(__name__)
 setup_logging("logs/utils.log", level="INFO")
 
 
+def load_settings(settings_file_path: str = "settings.yaml") -> dict:
+    """
+    Загружает конфигурацию из YAML-файла.
+
+    Args:
+        settings_file_path: Путь к файлу настроек.
+
+    Returns:
+        Словарь с настройками
+    """
+    yaml_file_path = Path(settings_file_path)
+
+    if not yaml_file_path.exists():
+        logger.error(f"Файл настроек не найден: {yaml_file_path.resolve()}")
+        raise FileNotFoundError(f"Файл настроек не найден: {yaml_file_path.resolve()}")
+
+    with yaml_file_path.open(encoding="utf-8") as yaml_file:
+        all_settings = yaml.safe_load(yaml_file)
+
+    return all_settings
+
+
 def drop_unwanted_symbols(text: str) -> str:
     """Удаляет нежелательные символы из текста."""
     text = text.replace('\xa0', ' ')   # неразрывный пробел
@@ -99,85 +121,8 @@ def drop_unwanted_symbols(text: str) -> str:
 
     # Убираем множественные пробелы (но не переносы строк)
     text = re.sub(r' {2,}', ' ', text)
+    text = re.sub(r'\\U[A-Z0-9]+', ' ', text)
     return text.strip()
-
-
-
-def save_list_dict_to_excel(
-    data_list_of_dictionaries: list[dict[str]], 
-    output_excel_file_path: str,
-    sheet_name: str = "Sheet1",
-    index_column_included: bool = False
-) -> bool:
-    """
-    Сохраняет список словарей в Excel файл (.xlsx).
-
-    Args:
-        data_list_of_dictionaries: Список словарей для сохранения
-        output_excel_file_path: Путь к выходному Excel файлу
-        sheet_name: Название листа в Excel файле (по умолчанию "Sheet1")
-        index_column_included: Включать ли индексную колонку (по умолчанию False)
-
-    Returns:
-        bool: True если сохранение прошло успешно, False в случае ошибки
-
-    Raises:
-        ValueError: Если список пуст или содержит некорректные данные
-        FileNotFoundError: Если не удается создать файл по указанному пути
-    """
-
-    # Проверяем входные данные
-    if not data_list_of_dictionaries:
-        error_message = "Список словарей пуст - нечего сохранять"
-        logging.error(error_message)
-        raise ValueError(error_message)
-
-    if not isinstance(data_list_of_dictionaries, list):
-        error_message = "Входные данные должны быть списком"
-        logging.error(error_message)
-        raise ValueError(error_message)
-
-    # Проверяем что все элементы являются словарями
-    for index, dictionary_item in enumerate(data_list_of_dictionaries):
-        if not isinstance(dictionary_item, dict):
-            error_message = f"Элемент с индексом {index} не является словарем"
-            logging.error(error_message)
-            raise ValueError(error_message)
-
-    try:
-        # Создаем DataFrame из списка словарей
-        dataframe_from_dictionaries = pd.DataFrame(data_list_of_dictionaries)
-
-        logging.info(f"Создан DataFrame с размерностью {dataframe_from_dictionaries.shape}")
-        logging.info(f"Столбцы таблицы: {list(dataframe_from_dictionaries.columns)}")
-
-        # Сохраняем в Excel файл
-        with pd.ExcelWriter(
-            output_excel_file_path, 
-            engine='openpyxl', 
-            mode='w'
-        ) as excel_writer:
-            dataframe_from_dictionaries.to_excel(
-                excel_writer,
-                sheet_name=sheet_name,
-                index=index_column_included,
-                na_rep=''  # Заменяем NaN пустыми строками
-            )
-
-        logging.info(f"Данные успешно сохранены в файл: {output_excel_file_path}")
-        logging.info(f"Лист: {sheet_name}, строк данных: {len(data_list_of_dictionaries)}")
-
-        return True
-
-    except PermissionError as permission_error:
-        error_message = f"Нет прав для записи в файл {output_excel_file_path}: {permission_error}"
-        logging.error(error_message)
-        return False
-
-    except FileNotFoundError as file_not_found_error:
-        error_message = f"Не удается создать файл по пути {output_excel_file_path}: {file_not_found_error}"
-        logging.error(error_message)
-        raise FileNotFoundError(error_message)
 
 
 def extract_pdf_full_text_advanced(pdf_url: str) -> str:
@@ -388,7 +333,7 @@ def generate_qr_code(
     print(f"QR-код сохранён в: {output_file_path}")
 
 
-def save_valid_sert(host="roskazna.gov.ru") -> str:
+def save_valid_sert(bundle_filename: str, host="roskazna.gov.ru"):
     """
     Загружает валидный сертификат для указанного сайта
     
@@ -417,7 +362,7 @@ def save_valid_sert(host="roskazna.gov.ru") -> str:
                 # Резервный вариант для более старых версий Python (< 3.13)
                 ssl_certs = [ssock.getpeercert(binary_form=True)]
 
-    bundle_filename = "roskazna_bundle.pem"
+    
     with open(bundle_filename, "w", encoding="utf-8") as f:
         for cert in ssl_certs:
             # Случай 1: Python 3.13 (объекты нового класса _ssl.Certificate)
@@ -437,4 +382,3 @@ def save_valid_sert(host="roskazna.gov.ru") -> str:
 
     logger.info(f"Успешно! Файл '{bundle_filename}' создан.")
 
-    return bundle_filename

@@ -15,8 +15,6 @@ from utils import setup_logging
 logger = logging.getLogger(__name__)
 setup_logging(log_file_path="logs/roskazna_handler.log", level="INFO")
 
-CERT_BUNDLE_PATH = "./roskazna_bundle.pem"
-
 roskazna_rss_url = 'https://roskazna.gov.ru'
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -43,19 +41,37 @@ class TextExtractorHTMLParser(HTMLParser):
 
 
 # 1. Создаем кастомный SSL-адаптер
+from urllib3.util import create_urllib3_context
+
 class CustomSSLAdapter(HTTPAdapter):
+    def __init__(self, cert_path, *args, **kwargs):
+        self.cert_path = cert_path
+        super(CustomSSLAdapter, self).__init__(*args, **kwargs)
+
     def init_poolmanager(self, *args, **kwargs):
-        # Создаем стандартный контекст SSL
-        context = ssl.create_default_context()
-        # Принудительно загружаем наш рабочий бандл Минцифры в контекст
-        context.load_verify_locations(cafile=CERT_BUNDLE_PATH)
+        # 1. Используем контекст urllib3, он более гибок для requests
+        context = create_urllib3_context()
         
-        # Передаем настроенный контекст в менеджер пулов
+        # 2. Разрешаем старые/специфические шифры (актуально для гос сайтов РФ)
+        context.set_ciphers('DEFAULT@SECLEVEL=1')
+        
+        # 3. Загружаем ваш сертификат Минцифры
+        context.load_verify_locations(cafile=self.cert_path)
+        
         kwargs['ssl_context'] = context
         return super(CustomSSLAdapter, self).init_poolmanager(*args, **kwargs)
 
+    def proxy_manager_for(self, *args, **kwargs):
+        # Обязательно переопределяем, чтобы настройки не слетали при работе через прокси
+        context = create_urllib3_context()
+        context.set_ciphers('DEFAULT@SECLEVEL=1')
+        context.load_verify_locations(cafile=self.cert_path)
+        
+        kwargs['ssl_context'] = context
+        return super(CustomSSLAdapter, self).proxy_manager_for(*args, **kwargs)
 
-def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
+
+def get_latest_roskazna_docs(start_date: datetime, cert_bundle_path: str) -> list[dict[str, str]]:
     """
     Получает RSS-ленту новостей с сайта Росказны и возвращает новости,
     опубликованные после указанной даты.
@@ -80,8 +96,9 @@ def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
 
         # Выполняем HTTP-запрос для получения XML
         session = requests.Session()
+        adapter = CustomSSLAdapter(cert_path=cert_bundle_path)
         # Монтируем адаптер для всех сайтов, начинающихся с https://
-        session.mount('https://', CustomSSLAdapter())
+        session.mount('https://', adapter)
 
         try:
             # Важно: внутри session.get параметр verify указывать НЕ нужно (он уже внутри контекста), 
@@ -95,29 +112,31 @@ def get_latest_roskazna_docs(start_date: datetime) -> list[dict[str, str]]:
                 
         except requests.exceptions.ConnectionError as e:
             logger.error(f"Ошибка соединения (сброс): {e}")
+            return []
         except requests.exceptions.SSLError as e:
             logger.error(f"Ошибка SSL: {e}")
+            return []
+        else:
+            http_response.raise_for_status()
+            http_response.encoding = 'utf-8'
 
-        http_response.raise_for_status()
-        http_response.encoding = 'utf-8'
+            logger.info(f"RSS-лента успешно получена, размер: {len(http_response.content)} байт")
 
-        logger.info(f"RSS-лента успешно получена, размер: {len(http_response.content)} байт")
+            # Парсим XML
+            xml_root_element = ET.fromstring(http_response.content)
 
-        # Парсим XML
-        xml_root_element = ET.fromstring(http_response.content)
+            # Находим все элементы <item> внутри <channel>
+            news_items_elements = xml_root_element.findall('.//channel/item')
+            logger.info(f"Найдено {len(news_items_elements)} новостей в RSS-ленте")
 
-        # Находим все элементы <item> внутри <channel>
-        news_items_elements = xml_root_element.findall('.//channel/item')
-        logger.info(f"Найдено {len(news_items_elements)} новостей в RSS-ленте")
+            # Обрабатываем каждый элемент новости
+            for news_item_element in news_items_elements:
+                news_item_data_dict = extract_news_item_data(news_item_element, start_date)
 
-        # Обрабатываем каждый элемент новости
-        for news_item_element in news_items_elements:
-            news_item_data_dict = extract_news_item_data(news_item_element, start_date)
+                if news_item_data_dict is not None:
+                    filtered_news_items_list.append(news_item_data_dict)
 
-            if news_item_data_dict is not None:
-                filtered_news_items_list.append(news_item_data_dict)
-
-        logger.info(f"Отфильтровано {len(filtered_news_items_list)} новостей после {start_date.date()}")
+            logger.info(f"Отфильтровано {len(filtered_news_items_list)} новостей после {start_date.date()}")
 
     except requests.exceptions.RequestException as request_error:
         logger.error(f"Ошибка при запросе RSS-ленты: {request_error}")

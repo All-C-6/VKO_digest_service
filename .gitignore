@@ -7,7 +7,7 @@
 *.session
 *.md
 *.yaml
-/pdf_output
+output/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
