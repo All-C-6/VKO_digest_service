@@ -116,6 +116,7 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
             - 'link': Ссылка на документ
             - 'meta': Описание документа
             - 'pub_date': Дата публикации в строковом формате
+            - 'type': document
 
     """
     cbr_rss_url = "https://www.cbr.ru/rss/navr"
@@ -168,7 +169,8 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
                         'title': document_title.text.strip(),
                         'link': document_link.text.strip(),
                         'meta': document_description.text.strip() if document_description is not None else '',
-                        'pub_date': parsed_publication_datetime.isoformat()
+                        'pub_date': parsed_publication_datetime.isoformat(),
+                        'type': 'document'
                     }
 
                     resulting_documents_list.append(document_info)
@@ -287,7 +289,7 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
         start_date: Дата, до которой нужно загрузить новости (включительно)
 
     Returns:
-        Список словарей с ключами: title, link, meta, pub_date
+        Список словарей с ключами: title, link, meta, pub_date, type
     """
     base_url = "https://www.cbr.ru/FPEventAndPress/"
 
@@ -359,7 +361,8 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
                     "title": drop_unwanted_symbols(news_item.get("name_doc", "")),
                     "link": article_link,
                     "meta": info_string,
-                    "pub_date": publication_datetime.strftime("%Y-%m-%d")
+                    "pub_date": publication_datetime.strftime("%Y-%m-%d"),
+                    "type": "news"
                 })
 
                 time.sleep(0.3)

@@ -15,7 +15,7 @@ import yaml
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
 from cbr_handler import get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
 from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer, summarize_single_news
-from roskazna_handler import get_latest_roskazna_docs
+from roskazna_handler import get_latest_roskazna_news
 from ach_handler import get_latest_ach_docs
 from tg_handler import get_channel_posts_by_dates, get_latest_cbr_posts
 from utils import generate_qr_code, get_elements_from_yaml, save_valid_sert, setup_logging, load_settings, convert_data_to_md, convert_data_to_yaml, save_yaml
@@ -36,7 +36,7 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     cert_path = settings["paths"]["ca_bundle_path"]
     # проверка доступности сайтов
     try:
-        get_latest_roskazna_docs(datetime.today() - timedelta(days=1), cert_path)
+        get_latest_roskazna_news(datetime.today() - timedelta(days=1), cert_path)
     except requests.exceptions.SSLError as ssl_error:
         logger.warning(f"Не совпал SSL сертификат для roskazna.gov.ru: {ssl_error}")
         save_valid_sert(cert_path)
@@ -44,11 +44,11 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     # все функции возвращают данные в едином виде
     all_news_and_docs = []
 
-    #all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
+    all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_docs(start_date))
     all_news_and_docs.extend(get_latest_cbr_news(start_date))
     all_news_and_docs.extend(get_latest_cbr_posts(start_date, end_date, cb_username, tg_api_id, tg_api_hash))
-    all_news_and_docs.extend(get_latest_roskazna_docs(start_date, cert_path))
+    all_news_and_docs.extend(get_latest_roskazna_news(start_date, cert_path))
     all_news_and_docs.extend(get_latest_ach_docs(start_date))
 
     return all_news_and_docs

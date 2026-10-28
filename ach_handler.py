@@ -123,6 +123,7 @@ def get_latest_ach_docs(start_date: datetime) -> list[dict]:
                     "meta": cleaned_meta_text,
                     "link": report_link,
                     "pub_date": parsed_document_date.strftime("%Y-%m-%d"),
+                    "type": "document"
                 }
                 processed_documents_list.append(document_details)
 

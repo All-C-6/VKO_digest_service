@@ -71,7 +71,7 @@ class CustomSSLAdapter(HTTPAdapter):
         return super(CustomSSLAdapter, self).proxy_manager_for(*args, **kwargs)
 
 
-def get_latest_roskazna_docs(start_date: datetime, cert_bundle_path: str) -> list[dict[str, str]]:
+def get_latest_roskazna_news(start_date: datetime, cert_bundle_path: str) -> list[dict[str, str]]:
     """
     Получает RSS-ленту новостей с сайта Росказны и возвращает новости,
     опубликованные после указанной даты.
@@ -86,6 +86,7 @@ def get_latest_roskazna_docs(start_date: datetime, cert_bundle_path: str) -> lis
         - link: ссылка на новость
         - meta: описание новости
         - pub_date: дата публикации (без времени)
+        - type: 'news'
     """
     
     roskazna_rss_url = "https://roskazna.gov.ru/rss"
@@ -195,7 +196,8 @@ def extract_news_item_data(
             'title': news_title,
             'link': news_link,
             'meta': news_description,
-            'pub_date': publication_date_only
+            'pub_date': publication_date_only,
+            'type': 'news'
         }
 
         return news_item_data_dict

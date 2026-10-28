@@ -352,6 +352,7 @@ def get_latest_kremlin_docs(start_date: datetime, end_date=datetime.today(), del
                              - 'meta': дополнительная информация (например, "О Храмове О.В.")
                              - 'pub_date': дата публикации
                              - 'link': полный URL документа
+                             - 'type': document
     """
 
     # Настройка логирования
@@ -492,7 +493,8 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
         'title': clean_document_title,
         'meta': article_text_meta,
         'pub_date': document_datetime,
-        'link': full_document_url
+        'link': full_document_url,
+        'type': 'document'
     }
 
 

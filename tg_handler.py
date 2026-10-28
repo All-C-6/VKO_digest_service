@@ -115,7 +115,8 @@ def format_tg_post(post: dict) -> dict:
         'title': document_title.text.strip(),
         'link': document_link.text.strip(),
         'meta': document_description.text.strip() if document_description is not None else '',
-        'pub_date': parsed_publication_datetime.isoformat()
+        'pub_date': parsed_publication_datetime.isoformat(),
+        'type': 'news'
     }
     """
     text = post['text']
@@ -127,7 +128,12 @@ def format_tg_post(post: dict) -> dict:
     elif re.search(". [А-Я]", text):
         title = re.split(". [А-Я]")[0]
     
-    return {"id": str(post["id"]), "title": title, "link": post["link"], "meta": formatted_text, "pub_date": formatted_date}
+    return {"id": str(post["id"]), 
+            "title": title, 
+            "link": post["link"], 
+            "meta": formatted_text, 
+            "pub_date": formatted_date,
+            "type": "news"}
 
 
 
@@ -149,6 +155,7 @@ def get_latest_cbr_posts(start_date, end_date, CB_USERNAME, API_ID, API_HASH):
             'link': document_link.text.strip(),
             'meta': document_description.text.strip() if document_description is not None else '',
             'pub_date': parsed_publication_datetime.isoformat()
+            'type': 'news'
         }
         """
         logger.debug(f"Получено постов: {len(posts)}")
