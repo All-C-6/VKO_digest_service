@@ -56,7 +56,3 @@ def extract_pdf_text_with_opendataloader(pdf_path: Path) -> str:
     )
 
 
-if __name__ == "__main__":
-    path = Path("/home/all-c/Загрузки/7317-У_27052026.pdf")
-    if path.exists():
-        get_text_from_opendataloader_json(path)

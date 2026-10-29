@@ -12,27 +12,29 @@ from telethon import TelegramClient
 import requests
 import yaml
 
+from formatter import create_digest_document
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
 from cbr_handler import get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
 from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer, summarize_single_news
 from roskazna_handler import get_latest_roskazna_news
 from ach_handler import get_latest_ach_docs
-from tg_handler import get_channel_posts_by_dates, get_latest_cbr_posts
-from utils import generate_qr_code, get_elements_from_yaml, save_valid_sert, setup_logging, load_settings, convert_data_to_md, convert_data_to_yaml, save_yaml
+from tg_handler import get_channel_posts_by_dates, get_latest_tg_posts
+from utils import generate_and_bind_qr_files, get_elements_from_yaml, save_valid_sert, setup_logging, load_settings, convert_data_to_md, convert_data_to_yaml, save_yaml
 
 logger = setup_logging(log_file_path="logs/loader.log", level="INFO")
 settings = load_settings("settings.yaml")
 input_dir = settings["paths"]["input_dir"]
 output_dir = settings["paths"]["output_dir"]
 
-def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=14), end_date = datetime.today()) -> list[dict]:
+def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=5), end_date = datetime.today()) -> list[dict]:
     """
     Получение всех последних данных из разных источников
     """
 
     tg_api_id = settings["telegram"]["api_id"]
     tg_api_hash = settings["telegram"]["api_hash"]
-    cb_username = settings["telegram"]["username"]
+    cb_username = settings["telegram"]["cb_username"]
+    ach_username = settings["telegram"]["ach_username"]
     cert_path = settings["paths"]["ca_bundle_path"]
     # проверка доступности сайтов
     try:
@@ -47,7 +49,8 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_docs(start_date))
     all_news_and_docs.extend(get_latest_cbr_news(start_date))
-    all_news_and_docs.extend(get_latest_cbr_posts(start_date, end_date, cb_username, tg_api_id, tg_api_hash))
+    all_news_and_docs.extend(get_latest_tg_posts(start_date, end_date, cb_username, tg_api_id, tg_api_hash))
+    all_news_and_docs.extend(get_latest_tg_posts(start_date, end_date, ach_username, tg_api_id, tg_api_hash))
     all_news_and_docs.extend(get_latest_roskazna_news(start_date, cert_path))
     all_news_and_docs.extend(get_latest_ach_docs(start_date))
 
@@ -64,29 +67,30 @@ if __name__ == "__main__":
     prompt = """
     Роль: Аналитик регуляторных рисков и макроэкономики банковского сектора.
 
-    Задача: Проведи фильтрацию входящего списка новостей и документов. Отбери ТОЛЬКО критически значимые события федерального/системного уровня.
+    Задача: Проведи фильтрацию входящего списка новостей и документов. Отбери ТОЛЬКО критически значимые события федерального/системного уровня, без дублей (оставлять поочередно разные источники для разнообразия).
 
     Критерии отбора (ВКЛЮЧАТЬ):
         1. Пруденциальное регулирование: ключевые решения ЦБ РФ/Минфина/правительства, напрямую влияющие на системно значимые кредитные организации (СЗКО).
         2. Макроэкономика: решения по ключевой ставке, фундаментальные изменения налогообложения финансового сектора, валютного курса, долгового рынка и т.д.
         3. Официальные прогнозы и выступления/интервью государственных ведомств.
-        4. Топ-кадры: кадровые перестановки только уровня руководства регуляторов (ЦБ, Минфин, ФАС).
-        5. Изменения в области кредитования и других услуг для клиентов банков
+        4. Топ-кадры: кадровые перестановки уровня руководства Банка России, Министерства экономического развития, Министерства финансов, Счетной Палаты.
+        5. Важные международные и федеральные встречи и мероприятия, влияющие на макроэкономику и планы госструктур.
+        6. Изменения в области кредитования и других услуг для клиентов банков (физических и юридических).
 
     Критерии отсечения (ИСКЛЮЧАТЬ):
         - Неясные изменения с недостаточным количеством подробностей.
         - Внутренние нормативы и правила государственных ведомств.
-        - Направленные не на системообразующие банки (МФО, строительные холдинги и т.д.).
-        - Любые региональные, муниципальные и точечные отраслевые изменения (промышленность, ритейл, АПК и т.д., если они не связаны напрямую с банковской системой в целом).
+        - Направленные не на системообразующие банки (микрофинансовые организации, НКО, малые бынки, строительные холдинги, добычу полезных ископаемых и т.д.).
+        - Любые региональные, муниципальные и точечные отраслевые изменения (промышленность, ритейл и т.д., если они не связаны напрямую с банковской системой в целом).
         - Кадровые изменения среднего звена или в региональных подразделениях.
         - Аналитические прогнозы и мнения экспертов, опросы и информационный шум.
 
     Формат вывода:
-        - Только список отобранных пунктов строго по шаблону: ID - заголовок новости/документа
+        - Только список отобранных пунктов строго по шаблону: ID - заголовок новости/документа (при дублях поочередно оставлять для одной новости - только сайт, для другой - только tekegram канал и так далее)
         - Если ни один документ не прошел фильтр, выведи: «Нет критически значимых изменений».
         - Запрещены любые вводные слова, рассуждения, примечания и оговорки о потенциальной пользе.
     """
-    start = datetime.today() - timedelta(days=14)
+    start = datetime.today() - timedelta(days=7)
     end = datetime.today()
 
     # загрузка данных
@@ -140,7 +144,8 @@ if __name__ == "__main__":
 
     # создание новых QR-кодов
     logger.info("Создание новых QR-кодов...")
-    for key, link in links.items():
-        generate_qr_code(link, f"{qr_code_path}/{datetime.today().strftime("%Y-%m-%d")}_{key}.png")
-    logger.info(f"Создано {len(links)} QR-кодов.")
+    generate_and_bind_qr_files(summarized_filtered_items, f"{qr_code_path}/{datetime.today().strftime("%Y-%m-%d")}.png")
+    logger.info(f"Создано {len(summarized_filtered_items)} QR-кодов.")
+
+    create_digest_document(summarized_filtered_items, f"{output_dir}/дайджест_новостей_ВКО_{datetime.today().strftime('%Y-%m-%d')}.docx")
 

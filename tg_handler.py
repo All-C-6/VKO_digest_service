@@ -138,15 +138,27 @@ def format_tg_post(post: dict) -> dict:
 
 
 
-def get_latest_cbr_posts(start_date, end_date, CB_USERNAME, API_ID, API_HASH):
+def get_latest_tg_posts(start_date, end_date, TGC_USERNAME, API_ID, API_HASH) -> list[dict]:
+    """
+    Загрузка последних постов из канала, начиная со {start_date}
 
+    Args:
+        start_date: дата, начиная с которой нужно получить данные
+        end_date: дата, после которой данные уже не нужны
+        TGC_USERNAME: имя канала (не группы!), из которого нужно загрузить посты
+        API_ID: ID приложения Telegram
+        API_HASH: хэш приложения Telegram
+
+    Returns:
+        posts: посты в виде списка словарей
+    """
     try:
         # Инициализируем клиент
         client = TelegramClient("session_name", API_ID, API_HASH)
         client.start()
         # Запускаем корутину внутри loop клиента
         posts = client.loop.run_until_complete(
-            get_channel_posts_by_dates(client, CB_USERNAME, start_date, end_date)
+            get_channel_posts_by_dates(client, TGC_USERNAME, start_date, end_date)
         )
         """
         document_info = {

@@ -8,6 +8,8 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn, nsdecls
 
+from utils import generate_qr_buffer
+
 
 def clean_title(title: str) -> str:
     """Очищает заголовок от markdown-разметки, эмодзи и неразрывных пробелов."""
@@ -31,6 +33,8 @@ def get_source_label(link: str) -> str:
     link_lower = link.lower()
     if 't.me/centralbank_russia' in link_lower:
         return 'Телеграм-канал Банка России'
+    elif 't.me/' in link_lower:
+        return 'сайт Банка России'
     elif 'cbr.ru' in link_lower:
         return 'сайт Банка России'
     elif 'kremlin.ru' in link_lower:
@@ -39,7 +43,8 @@ def get_source_label(link: str) -> str:
         return 'сайт Федерального казначейства'
     elif 'ach.gov.ru' in link_lower:
         return 'сайт Счетной палаты'
-    return 'официальный источник'
+    # возвращаем ссылку на ресурс
+    return f'официальный источник: {link}'
 
 
 def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
@@ -210,11 +215,11 @@ def create_digest_document(items: list[dict], output_path: str = "дайджес
         p_qr.paragraph_format.space_after = Pt(0)
         p_qr.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        qr_path = item.get("qr_path")
-        if qr_path and os.path.exists(qr_path):
+        link = item.get("link")
+        if link:
+            qr_stream = generate_qr_buffer(link)
             r_qr = p_qr.add_run()
-            # Ширина изображения чуть меньше ширины ячейки (1.3 дюйма отлично вписывается в 25%)
-            r_qr.add_picture(qr_path, width=Inches(1.3))
+            r_qr.add_picture(qr_stream, width=Inches(1.3))
         else:
             r_qr = p_qr.add_run("[QR-код]")
             r_qr.font.size = Pt(8.5)

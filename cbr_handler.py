@@ -199,7 +199,7 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
         raise
 
 
-def get_central_bank_draft_regulatory_acts(start_date: datetime) -> list[dict]:
+def get_central_bank_draft_docs(start_date: datetime) -> list[dict]:
     """
     Получает последние проекты нормативных актов (НПА) от Центрального Банка РФ.
 

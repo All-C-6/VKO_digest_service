@@ -295,28 +295,42 @@ def get_elements_from_yaml(attr_name: str, yaml_file_path: str) -> dict:
     return result_dict
 
 
-def generate_qr_code(
+def generate_and_bind_qr_files(items: list[dict], output_dir: str = "output/qrs") -> None:
+    qr_dir = Path(output_dir)
+    qr_dir.mkdir(parents=True, exist_ok=True)
+
+    for item in items:
+        item_id = item.get("id")
+        link = item.get("link")
+        
+        if not item_id or not link:
+            continue
+
+        file_path = qr_dir / f"{item_id}.png"
+        
+        # Генерируем напрямую в файл (segno умеет писать сразу в путь)
+        qr = segno.make(link, error="H")
+        qr.save(
+            str(file_path),
+            scale=10,
+            dark="#0A5B5F",
+            light="#FFFFFF"
+        )
+        
+        # Привязываем точный путь обратно к словарю
+        item["qr_path"] = str(file_path)
+
+
+def generate_qr_buffer(
     content: str,
-    output_file_path: str,
     scale: int = 10,
     dark_color: str = "#0A5B5F",
     light_color: str = "#FFFFFF",
-) -> None:
+) -> io.BytesIO:
     """
-    Генерирует QR-код тёмно-синего цвета и сохраняет его в формате PNG.
-
-    Args:
-        content: содержимое QR-кода (ссылка)
-        output_file_path: путь для сохранения QR-кода
-        scale: масштаб изображения
-        dark_color: цвет тёмной области кода
-        light_color: цвет светлой области кода
-
-    Returns:
-        None, сохраняет QR-код в файл
+    Генерирует QR-код и возвращает BytesIO буфер с PNG-данными.
     """
     qr_code = segno.make(content, error="H")
-
     png_buffer = io.BytesIO()
     qr_code.save(
         png_buffer,
@@ -326,11 +340,7 @@ def generate_qr_code(
         light=light_color,
     )
     png_buffer.seek(0)
-
-    qr_image = Image.open(png_buffer)
-    qr_image.save(output_file_path, format="PNG")
-
-    print(f"QR-код сохранён в: {output_file_path}")
+    return png_buffer
 
 
 def save_valid_sert(bundle_filename: str, host="roskazna.gov.ru"):
