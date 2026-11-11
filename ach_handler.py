@@ -27,7 +27,7 @@ def get_latest_ach_docs(start_date: datetime) -> list[dict]:
 
     Returns:
         Список словарей, где каждый словарь представляет собой информацию
-        о проверке, включая заголовок, метаданные, ссылку на отчет, дату и т.д.
+        о проверке, включая заголовок, описание, ссылку на отчет, дату и т.д.
         Возвращает пустой список в случае ошибки.
     """
 
@@ -115,13 +115,12 @@ def get_latest_ach_docs(start_date: datetime) -> list[dict]:
 
                 # Очищаем PREVIEW_TEXT от HTML-тегов
                 preview_html = document_item.get("PREVIEW_TEXT", "")
-                cleaned_meta_text = BeautifulSoup(preview_html, "html.parser").get_text().strip()
+                cleaned_desc_text = BeautifulSoup(preview_html, "html.parser").get_text().strip()
 
                 document_details = {
-                    "id": str(document_item.get("ID")),
+                    "id": report_link,
                     "title": document_item.get("NAME"),
-                    "meta": cleaned_meta_text,
-                    "link": report_link,
+                    "desc": cleaned_desc_text,
                     "pub_date": parsed_document_date.strftime("%Y-%m-%d"),
                     "type": "document"
                 }

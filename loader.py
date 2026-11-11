@@ -14,7 +14,7 @@ import yaml
 
 from formatter import create_digest_document
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
-from cbr_handler import get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
+from cbr_handler import get_cbr_draft_docs, get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
 from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer, summarize_single_news
 from roskazna_handler import get_latest_roskazna_news
 from ach_handler import get_latest_ach_docs
@@ -49,6 +49,7 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_docs(start_date))
     all_news_and_docs.extend(get_latest_cbr_news(start_date))
+    all_news_and_docs.extend(get_cbr_draft_docs(start_date))
     all_news_and_docs.extend(get_latest_tg_posts(start_date, end_date, cb_username, tg_api_id, tg_api_hash))
     all_news_and_docs.extend(get_latest_tg_posts(start_date, end_date, ach_username, tg_api_id, tg_api_hash))
     all_news_and_docs.extend(get_latest_roskazna_news(start_date, cert_path))
@@ -115,15 +116,14 @@ if __name__ == "__main__":
 
     id_set = extract_items_from_llm_answer(summary_result)
     
-    logger.info(f"Идентификаторы интересующих новостей: {id_set}")
+    logger.debug(f"Идентификаторы интересующих новостей: {id_set}")
 
     filtered_items = filter_valid_news_and_docs(all_items, id_set)
     summarized_filtered_items = []
     for item in filtered_items:
         item["summary"] = summarize_single_news(item, deepseek_settings)
-        summarized_filtered_items.append(item)
     filtered_items_yaml_string = convert_data_to_yaml(summarized_filtered_items, f"{output_dir}/summarized_filtered_data.yaml")
-    links = get_elements_from_yaml("link", f"{output_dir}/summarized_filtered_data.yaml")
+    links = get_elements_from_yaml("id", f"{output_dir}/summarized_filtered_data.yaml")
 
     
     # создание папки для сохранения QR-кодов

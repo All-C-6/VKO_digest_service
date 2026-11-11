@@ -114,7 +114,7 @@ def format_tg_post(post: dict) -> dict:
         'id': document_guid.text.strip(),
         'title': document_title.text.strip(),
         'link': document_link.text.strip(),
-        'meta': document_description.text.strip() if document_description is not None else '',
+        'desc': document_description.text.strip() if document_description is not None else '',
         'pub_date': parsed_publication_datetime.isoformat(),
         'type': 'news'
     }
@@ -128,17 +128,16 @@ def format_tg_post(post: dict) -> dict:
     elif re.search(". [А-Я]", text):
         title = re.split(". [А-Я]")[0]
     
-    return {"id": str(post["id"]), 
-            "title": title, 
-            "link": post["link"], 
-            "meta": formatted_text, 
+    return {"id": post["link"],
+            "title": title,
+            "desc": formatted_text,
             "pub_date": formatted_date,
             "type": "news"}
 
 
 
 
-def get_latest_tg_posts(start_date, end_date, TGC_USERNAME, API_ID, API_HASH) -> list[dict]:
+def get_latest_tg_posts(start_date, end_date, tgc_username, api_id, api_hash) -> list[dict]:
     """
     Загрузка последних постов из канала, начиная со {start_date}
 
@@ -154,23 +153,13 @@ def get_latest_tg_posts(start_date, end_date, TGC_USERNAME, API_ID, API_HASH) ->
     """
     try:
         # Инициализируем клиент
-        client = TelegramClient("session_name", API_ID, API_HASH)
+        client = TelegramClient("session_name", api_id, api_hash)
         client.start()
         # Запускаем корутину внутри loop клиента
         posts = client.loop.run_until_complete(
-            get_channel_posts_by_dates(client, TGC_USERNAME, start_date, end_date)
+            get_channel_posts_by_dates(client, tgc_username, start_date, end_date)
         )
-        """
-        document_info = {
-            'id': document_guid.text.strip(),
-            'title': document_title.text.strip(),
-            'link': document_link.text.strip(),
-            'meta': document_description.text.strip() if document_description is not None else '',
-            'pub_date': parsed_publication_datetime.isoformat()
-            'type': 'news'
-        }
-        """
-        logger.debug(f"Получено постов: {len(posts)}")
+        logger.debug(f"Получено постов: {len(posts)} из канала {tgc_username}")
 
     except Exception as e:
         logger.error(f"Ошибка обращения к Telegram: {e}")

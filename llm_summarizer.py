@@ -120,7 +120,7 @@ def summarize_single_news(
     """Генерирует краткое саммари (строго в один абзац) для одной новости/документа.
 
     Args:
-        news_item: Словарь с полями новости ('id', 'title', 'meta', 'link' и т.д.).
+        news_item: Словарь с полями новости ('id', 'title', 'desc', 'type' и 'pub_date'.).
         custom_instruction: Дополнительные указания для модели (опционально).
         settings_file_path: Путь к YAML-файлу с настройками (по умолчанию "settings.yaml").
 
@@ -149,7 +149,7 @@ def summarize_single_news(
 
     # Собираем контекст конкретной новости
     news_title = news_item.get("title", "")
-    news_content = news_item.get("meta", "")
+    news_content = news_item.get("desc", "")
     news_date = news_item.get("pub_date", "")
 
     user_content_parts = [

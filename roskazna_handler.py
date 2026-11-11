@@ -81,10 +81,9 @@ def get_latest_roskazna_news(start_date: datetime, cert_bundle_path: str) -> lis
 
     Returns:
         Список словарей с данными новостей, содержащих ключи:
-        - id: идентификатор новости
+        - id: идентификатор новости (ссылка на новость)
         - title: заголовок новости
-        - link: ссылка на новость
-        - meta: описание новости
+        - desc: описание новости
         - pub_date: дата публикации (без времени)
         - type: 'news'
     """
@@ -195,7 +194,7 @@ def extract_news_item_data(
             'id': news_link.split('/')[-1],
             'title': news_title,
             'link': news_link,
-            'meta': news_description,
+            'desc': news_description,
             'pub_date': publication_date_only,
             'type': 'news'
         }

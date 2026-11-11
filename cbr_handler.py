@@ -94,7 +94,7 @@ def download_cbr_pdf(url: str, destination_directory: str = ".") -> str:
             if chunk:
                 file.write(chunk)
 
-    print(f"Файл успешно скачан: {full_file_path}")
+    logger.debug(f"Файл успешно скачан: {full_file_path}")
     return str(full_file_path)
 
 
@@ -111,10 +111,9 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
     Returns:
     
         list (list[Dict[str, str]]): Список словарей, каждый из которых содержит:
-            - 'id': Идентификатор документа Банка России
+            - 'id': Ссылка на документ (идентификатор)
             - 'title': Заголовок документа
-            - 'link': Ссылка на документ
-            - 'meta': Описание документа
+            - 'desc': Описание документа
             - 'pub_date': Дата публикации в строковом формате
             - 'type': document
 
@@ -168,7 +167,7 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
                         'id': document_guid.text.strip(),
                         'title': document_title.text.strip(),
                         'link': document_link.text.strip(),
-                        'meta': document_description.text.strip() if document_description is not None else '',
+                        'desc': document_description.text.strip() if document_description is not None else '',
                         'pub_date': parsed_publication_datetime.isoformat(),
                         'type': 'document'
                     }
@@ -190,16 +189,16 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
 
     except requests.RequestException as network_error:
         logger.error(f"Ошибка сетевого запроса к ЦБ РФ: {network_error}")
-        raise
+        return []
     except ET.ParseError as xml_parsing_error:
         logger.error(f"Ошибка парсинга XML от ЦБ РФ: {xml_parsing_error}")
-        raise
+        return []
     except Exception as unexpected_error:
         logger.error(f"Неожиданная ошибка при получении документов ЦБ РФ: {unexpected_error}")
-        raise
+        return []
 
 
-def get_central_bank_draft_docs(start_date: datetime) -> list[dict]:
+def get_cbr_draft_docs(start_date: datetime) -> list[dict]:
     """
     Получает последние проекты нормативных актов (НПА) от Центрального Банка РФ.
 
@@ -209,11 +208,11 @@ def get_central_bank_draft_docs(start_date: datetime) -> list[dict]:
     Returns:
         List[Dict[str, Optional[str]]]: Массив словарей с информацией о проектах НПА.
             Каждый словарь содержит поля:
+            - id: уникальная ссылка
             - title: название проекта
-            - link: ссылка на проект
-            - id: уникальный идентификатор
-            - meta: описание проекта
+            - desc: описание проекта
             - pub_date: дата публикации (строка)
+            - type: тип элемента (document_draft)
 
     Raises:
         requests.RequestException: Ошибка при получении данных с сервера
@@ -260,25 +259,25 @@ def get_central_bank_draft_docs(start_date: datetime) -> list[dict]:
             else:
                 doc_info = extract_pdf_full_text_advanced(pdf_url)
             
+            if link_element is not None:
+                draft_regulatory_act_info = {
+                    'id': link_element.text,
+                    'title': title_element.text if title_element is not None else None,
+                    'desc': drop_unwanted_symbols(doc_info),
+                    'pub_date': pub_date.date().isoformat(),
+                    'type': 'document_draft'
+                }
 
-            draft_regulatory_act_info = {
-                'title': title_element.text if title_element is not None else None,
-                'link': link_element.text if link_element is not None else None,
-                'id': guid_element.text,
-                'meta': drop_unwanted_symbols(doc_info),
-                'pub_date': pub_date.date().isoformat()
-            }
-
-            draft_regulatory_acts_list.append(draft_regulatory_act_info)
+                draft_regulatory_acts_list.append(draft_regulatory_act_info)
 
         return draft_regulatory_acts_list
 
     except requests.RequestException as request_error:
-        print(f"Ошибка при получении данных с сервера ЦБ РФ: {request_error}")
+        logger.error(f"Ошибка при получении данных с сервера ЦБ РФ: {request_error}")
     except ET.ParseError as parse_error:
-        print(f"Ошибка при парсинге XML: {parse_error}")
+        logger.error(f"Ошибка при парсинге XML: {parse_error}")
     except Exception as e_other:
-        print(f"Иная ошибка: {e_other}")
+        logger.error(f"Иная ошибка: {e_other}")
 
 
 def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
@@ -289,7 +288,13 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
         start_date: Дата, до которой нужно загрузить новости (включительно)
 
     Returns:
-        Список словарей с ключами: title, link, meta, pub_date, type
+        Список словарей с ключами
+            
+            - title 
+            - id
+            - desc
+            - pub_date
+            - type
     """
     base_url = "https://www.cbr.ru/FPEventAndPress/"
 
@@ -357,10 +362,9 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
 
                 # Добавляем в результат
                 collected_news_list.append({
-                    "id": article_id.split('.')[0],
+                    "id": article_link,
                     "title": drop_unwanted_symbols(news_item.get("name_doc", "")),
-                    "link": article_link,
-                    "meta": info_string,
+                    "": info_string,
                     "pub_date": publication_datetime.strftime("%Y-%m-%d"),
                     "type": "news"
                 })
@@ -374,10 +378,10 @@ def get_latest_cbr_news(start_date: datetime) -> list[dict[str, str]]:
             time.sleep(0.3)
 
         except requests.RequestException as request_error:
-            print(f"Ошибка при запросе страницы {current_page_number}: {request_error}")
+            logger.error(f"Ошибка при запросе страницы {current_page_number}: {request_error}")
             break
         except (KeyError, ValueError) as parsing_error:
-            print(f"Ошибка при обработке данных на странице {current_page_number}: {parsing_error}")
+            logger.error(f"Ошибка при обработке данных на странице {current_page_number}: {parsing_error}")
             break
 
     return collected_news_list

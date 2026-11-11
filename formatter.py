@@ -152,8 +152,8 @@ def create_digest_document(items: list[dict], output_path: str = "дайджес
     tblW.set(qn('w:type'), 'pct')
     tblW.set(qn('w:w'), '5000')
 
-    # Пропорции колонок в pct: 25% = 1250, 50% = 2500, 25% = 1250
-    pct_widths = ['1250', '2500', '1250']
+    # Пропорции колонок в pct
+    pct_widths = ['1250', '2700', '1050']
 
     for item in items:
         row = table.add_row()
@@ -195,7 +195,7 @@ def create_digest_document(items: list[dict], output_path: str = "дайджес
 
         p_src = cell_meta.add_paragraph()
         p_src.paragraph_format.space_after = Pt(0)
-        source_name = get_source_label(item.get("link", ""))
+        source_name = get_source_label(item.get("id", ""))
         r_src = p_src.add_run(f"Источник: {source_name}")
         r_src.font.name = "Calibri"
         r_src.font.size = Pt(9.5)
@@ -215,7 +215,7 @@ def create_digest_document(items: list[dict], output_path: str = "дайджес
         p_qr.paragraph_format.space_after = Pt(0)
         p_qr.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        link = item.get("link")
+        link = item.get("id")
         if link:
             qr_stream = generate_qr_buffer(link)
             r_qr = p_qr.add_run()

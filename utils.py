@@ -301,15 +301,14 @@ def generate_and_bind_qr_files(items: list[dict], output_dir: str = "output/qrs"
 
     for item in items:
         item_id = item.get("id")
-        link = item.get("link")
         
-        if not item_id or not link:
+        if not item_id or not item_id:
             continue
 
         file_path = qr_dir / f"{item_id}.png"
         
         # Генерируем напрямую в файл (segno умеет писать сразу в путь)
-        qr = segno.make(link, error="H")
+        qr = segno.make(item_id, error="H")
         qr.save(
             str(file_path),
             scale=10,

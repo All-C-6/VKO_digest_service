@@ -349,7 +349,7 @@ def get_latest_kremlin_docs(start_date: datetime, end_date=datetime.today(), del
         List[Dict[str, str]]: Список словарей с информацией о документах.
                              Каждый словарь содержит поля:
                              - 'title': заголовок документа
-                             - 'meta': дополнительная информация (например, "О Храмове О.В.")
+                             - 'desc': дополнительная информация (например, "О Храмове О.В.")
                              - 'pub_date': дата публикации
                              - 'link': полный URL документа
                              - 'type': document
@@ -484,16 +484,15 @@ def parse_single_document_entry(document_entry, kremlin_base_url: str) -> Option
     time.sleep(1)
     article = get_webpage_as_xml_tree(full_document_url)
     if len(article) > 0:
-        article_text_meta = extract_text_from_kremlin_docpage(article)
+        article_text = extract_text_from_kremlin_docpage(article)
     else:
-        article_text_meta = ""
+        article_text = ""
 
     return {
-        "id": document_href.split("/")[-1].split('.')[0],
+        'id': full_document_url,
         'title': clean_document_title,
-        'meta': article_text_meta,
+        'desc': article_text,
         'pub_date': document_datetime,
-        'link': full_document_url,
         'type': 'document'
     }
 
