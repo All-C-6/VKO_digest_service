@@ -11,11 +11,18 @@ from datetime import datetime, timezone
 from telethon import TelegramClient
 import requests
 import yaml
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+import opendataloader_pdf
 
 from formatter import create_digest_document
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
 from cbr_handler import get_cbr_draft_docs, get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
 from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer, summarize_single_news
+from pdf_handler import get_pdf_summary
 from roskazna_handler import get_latest_roskazna_news
 from ach_handler import get_latest_ach_docs
 from tg_handler import get_channel_posts_by_dates, get_latest_tg_posts
@@ -25,6 +32,18 @@ logger = setup_logging(log_file_path="logs/loader.log", level="INFO")
 settings = load_settings("settings.yaml")
 input_dir = settings["paths"]["input_dir"]
 output_dir = settings["paths"]["output_dir"]
+
+
+def wait_for_port(port: int, host: str = "127.0.0.1", timeout: float = 30.0) -> None:
+    """Ожидает, пока сервер начнет принимать подключения на указанном порту."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            if sock.connect_ex((host, port)) == 0:
+                return
+        time.sleep(0.5)
+    raise TimeoutError(f"Сервер не запустился на порту {port} за {timeout} сек.")
+
 
 def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=5), end_date = datetime.today()) -> list[dict]:
     """
@@ -46,8 +65,43 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     # все функции возвращают данные в едином виде
     all_news_and_docs = []
 
+    # только документы БР плохо обработаны
+    cbr_docs = get_latest_cbr_docs(start_date)
+
+    if cbr_docs:
+        # Находим исполняемый файл в том же виртуальном окружении, где запущен скрипт
+        bin_dir = Path(sys.executable).parent
+        server_bin = bin_dir / ("opendataloader-pdf-hybrid.exe" if sys.platform == "win32" else "opendataloader-pdf-hybrid")
+
+        cmd = [
+            str(server_bin),
+            "--port", "5002",
+            "--force-ocr",
+            "--ocr-lang", "ru,en",
+        ]
+
+        # Запускаем сервер как фоновый субпроцесс
+        server_proc = subprocess.Popen(cmd)
+
+        try:
+            # Ждем готовности порта (инициализация OCR-моделей может занять несколько секунд)
+            wait_for_port(5002, timeout=60.0)
+
+            # Выполняем конвертацию
+            for doc in cbr_docs:
+                pdf_text = get_pdf_summary(doc["id"])
+                doc["desc"] = pdf_text
+
+            all_news_and_docs.extend(cbr_docs)
+        finally:
+            # Гарантированно останавливаем сервер при завершении или ошибке
+            server_proc.terminate()
+            try:
+                server_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server_proc.kill()
+        
     all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
-    all_news_and_docs.extend(get_latest_cbr_docs(start_date))
     all_news_and_docs.extend(get_latest_cbr_news(start_date))
     all_news_and_docs.extend(get_cbr_draft_docs(start_date))
     all_news_and_docs.extend(get_latest_tg_posts(start_date, end_date, cb_username, tg_api_id, tg_api_hash))
