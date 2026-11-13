@@ -7,26 +7,23 @@ from datetime import datetime, timedelta
 from logging import getLogger
 import os
 from pathlib import Path
-from datetime import datetime, timezone
-from telethon import TelegramClient
+from datetime import datetime
 import requests
-import yaml
 import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
-import opendataloader_pdf
 
 from formatter import create_digest_document
 from kremlin_handler import get_latest_kremlin_docs, get_webpage_as_xml_tree
-from cbr_handler import get_cbr_draft_docs, get_central_bank_draft_regulatory_acts, get_latest_cbr_docs, get_latest_cbr_news
-from llm_summarizer import filter_valid_news_and_docs, get_list_summary, extract_items_from_llm_answer, summarize_single_news
+from cbr_handler import get_cbr_draft_docs, get_cbr_draft_docs, get_latest_cbr_docs, get_latest_cbr_news
+from llm_summarizer import extract_links_from_md, filter_valid_news_and_docs, get_list_summary, summarize_single_item
 from pdf_handler import get_pdf_summary
 from roskazna_handler import get_latest_roskazna_news
 from ach_handler import get_latest_ach_docs
 from tg_handler import get_channel_posts_by_dates, get_latest_tg_posts
-from utils import generate_and_bind_qr_files, get_elements_from_yaml, save_valid_sert, setup_logging, load_settings, convert_data_to_md, convert_data_to_yaml, save_yaml
+from utils import generate_and_bind_qr_files, get_elements_from_yaml, save_valid_sert, setup_logging, load_settings, convert_data_to_yaml, wait_for_port
 
 logger = setup_logging(log_file_path="logs/loader.log", level="INFO")
 settings = load_settings("settings.yaml")
@@ -34,18 +31,7 @@ input_dir = settings["paths"]["input_dir"]
 output_dir = settings["paths"]["output_dir"]
 
 
-def wait_for_port(port: int, host: str = "127.0.0.1", timeout: float = 30.0) -> None:
-    """Ожидает, пока сервер начнет принимать подключения на указанном порту."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            if sock.connect_ex((host, port)) == 0:
-                return
-        time.sleep(0.5)
-    raise TimeoutError(f"Сервер не запустился на порту {port} за {timeout} сек.")
-
-
-def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=5), end_date = datetime.today()) -> list[dict]:
+def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(days=14), end_date = datetime.today()) -> list[dict]:
     """
     Получение всех последних данных из разных источников
     """
@@ -68,7 +54,7 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
     # только документы БР плохо обработаны
     cbr_docs = get_latest_cbr_docs(start_date)
 
-    if cbr_docs:
+    if False:
         # Находим исполняемый файл в том же виртуальном окружении, где запущен скрипт
         bin_dir = Path(sys.executable).parent
         server_bin = bin_dir / ("opendataloader-pdf-hybrid.exe" if sys.platform == "win32" else "opendataloader-pdf-hybrid")
@@ -89,7 +75,7 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
 
             # Выполняем конвертацию
             for doc in cbr_docs:
-                pdf_text = get_pdf_summary(doc["id"])
+                pdf_text = get_pdf_summary(doc["id"]).replace("Ng", "№")
                 doc["desc"] = pdf_text
 
             all_news_and_docs.extend(cbr_docs)
@@ -100,8 +86,9 @@ def get_news_and_docs_by_timerange(start_date = datetime.today() - timedelta(day
                 server_proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 server_proc.kill()
-        
-    all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
+
+    #all_news_and_docs.extend(cbr_docs)
+    #all_news_and_docs.extend(get_latest_kremlin_docs(start_date, end_date))
     all_news_and_docs.extend(get_latest_cbr_news(start_date))
     all_news_and_docs.extend(get_cbr_draft_docs(start_date))
     all_news_and_docs.extend(get_latest_tg_posts(start_date, end_date, cb_username, tg_api_id, tg_api_hash))
@@ -125,17 +112,16 @@ if __name__ == "__main__":
     Задача: Проведи фильтрацию входящего списка новостей и документов. Отбери ТОЛЬКО критически значимые события федерального/системного уровня, без дублей (оставлять поочередно разные источники для разнообразия).
 
     Критерии отбора (ВКЛЮЧАТЬ):
-        1. Пруденциальное регулирование: ключевые решения ЦБ РФ/Минфина/правительства, напрямую влияющие на системно значимые кредитные организации (СЗКО).
-        2. Макроэкономика: решения по ключевой ставке, фундаментальные изменения налогообложения финансового сектора, валютного курса, долгового рынка и т.д.
-        3. Официальные прогнозы и выступления/интервью государственных ведомств.
-        4. Топ-кадры: кадровые перестановки уровня руководства Банка России, Министерства экономического развития, Министерства финансов, Счетной Палаты.
-        5. Важные международные и федеральные встречи и мероприятия, влияющие на макроэкономику и планы госструктур.
-        6. Изменения в области кредитования и других услуг для клиентов банков (физических и юридических).
+        1. Решения государтсвенных органов: ключевые решения ЦБ РФ/Минфина/правительства, напрямую влияющие на системно значимые кредитные организации (СЗКО).
+        2. Официальные прогнозы, обзоры и анализы банковской сферы и экономики, предложения и выступления/интервью государственных ведомств.
+        3. Топ-кадры: кадровые перестановки уровня руководства Банка России, Министерства экономического развития, Министерства финансов, Счетной Палаты.
+        4. Важные встречи, конференции и другие мероприятия государственных органов.
+        5. Изменения и анализ в области других услуг для клиентов банков (кредитование, жалобы, доступность услуг и т.д.).
 
     Критерии отсечения (ИСКЛЮЧАТЬ):
         - Неясные изменения с недостаточным количеством подробностей.
         - Внутренние нормативы и правила государственных ведомств.
-        - Направленные не на системообразующие банки (микрофинансовые организации, НКО, малые бынки, строительные холдинги, добычу полезных ископаемых и т.д.).
+        - Направленные не на системообразующие банки (микрофинансовые организации, НКО, малые банки, строительные холдинги и т.д.).
         - Любые региональные, муниципальные и точечные отраслевые изменения (промышленность, ритейл и т.д., если они не связаны напрямую с банковской системой в целом).
         - Кадровые изменения среднего звена или в региональных подразделениях.
         - Аналитические прогнозы и мнения экспертов, опросы и информационный шум.
@@ -145,7 +131,7 @@ if __name__ == "__main__":
         - Если ни один документ не прошел фильтр, выведи: «Нет критически значимых изменений».
         - Запрещены любые вводные слова, рассуждения, примечания и оговорки о потенциальной пользе.
     """
-    start = datetime.today() - timedelta(days=7)
+    start = datetime.today() - timedelta(days=14)
     end = datetime.today()
 
     # загрузка данных
@@ -154,12 +140,14 @@ if __name__ == "__main__":
     logger.info(f"Загрузка завершена. Загружено {len(all_items)} новостей и документов.")
 
     # конвертация данных в YAML
-    all_items_yaml_string = convert_data_to_yaml(all_items, f"{output_dir}/all_items")
+    with open(f"{output_dir}/all_items.json", 'w') as f:
+        json.dump(all_items, f, ensure_ascii=False, indent=4)
 
+    all_items_json_string = json.dumps(all_items, ensure_ascii=False)
     # получение сводного описания
     logger.info("Идет получение сводного описания...")
     summary_result = get_list_summary(
-        all_items_yaml_string,
+        all_items_json_string,
         prompt,
         deepseek_settings
     )
@@ -168,17 +156,13 @@ if __name__ == "__main__":
     with open(f"{output_dir}/list_summary.md", 'w') as list_summary_file:
         list_summary_file.write(summary_result)
 
-    id_set = extract_items_from_llm_answer(summary_result)
+    id_set = extract_links_from_md(summary_result)
     
     logger.debug(f"Идентификаторы интересующих новостей: {id_set}")
 
     filtered_items = filter_valid_news_and_docs(all_items, id_set)
-    summarized_filtered_items = []
     for item in filtered_items:
-        item["summary"] = summarize_single_news(item, deepseek_settings)
-    filtered_items_yaml_string = convert_data_to_yaml(summarized_filtered_items, f"{output_dir}/summarized_filtered_data.yaml")
-    links = get_elements_from_yaml("id", f"{output_dir}/summarized_filtered_data.yaml")
-
+        item["summary"] = summarize_single_item(item, deepseek_settings)
     
     # создание папки для сохранения QR-кодов
     logger.info("Создание папки для сохранения QR-кодов...")
@@ -198,8 +182,8 @@ if __name__ == "__main__":
 
     # создание новых QR-кодов
     logger.info("Создание новых QR-кодов...")
-    generate_and_bind_qr_files(summarized_filtered_items, f"{qr_code_path}/{datetime.today().strftime("%Y-%m-%d")}.png")
-    logger.info(f"Создано {len(summarized_filtered_items)} QR-кодов.")
+    generate_and_bind_qr_files(filtered_items, f"{qr_code_path}/{datetime.today().strftime("%Y-%m-%d")}.png")
+    logger.info(f"Создано {len(filtered_items)} QR-кодов.")
 
-    create_digest_document(summarized_filtered_items, f"{output_dir}/дайджест_новостей_ВКО_{datetime.today().strftime('%Y-%m-%d')}.docx")
+    create_digest_document(filtered_items, f"{output_dir}/дайджест_новостей_ВКО_{datetime.today().strftime('%Y-%m-%d')}.docx")
 

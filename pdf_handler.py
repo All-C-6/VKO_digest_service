@@ -106,14 +106,14 @@ def get_pdf_summary(pdf_url: str) -> str:
                     return ""
 
     except Exception as e:
-        logger.exception(f"Ошибка при скачивании PDF {pdf_url}: {e}")
+        logger.exception(f"Ошибка при скачивании PDF {pdf_url}: {e[:200]}")
         # Удаляем битый/неверный файл, если он успел создаться
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         return ""
 
     except Exception as e:
-        logger.error(f"Ошибка при скачивании PDF: {e}")
+        logger.error(f"Ошибка при скачивании PDF: {e[:200]}")
         return ""
     else:
         logger.info(f"Успешно скачан PDF {pdf_url}")
@@ -125,7 +125,7 @@ def get_pdf_summary(pdf_url: str) -> str:
     hybrid="docling-fast",
     format="markdown"
     )
-
+    logger.info(f"Успешно распознан PDF в Markdown с помощью OCR")
     # извлекает текст из JSON, сгенерированного OpenDataLoader
     with open(f"output/pdf_output/{Path(tmp_path).stem}.md", "r") as ocr_md_file:
         text = ocr_md_file.read()

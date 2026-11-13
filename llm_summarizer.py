@@ -59,34 +59,35 @@ def get_list_summary(string_with_data: str, prompt: str, deepseek_settings: dict
     return llm_response_text
 
 
-def extract_items_from_llm_answer(answer: str) -> set[str]:
+def extract_links_from_md(text: str) -> set:
+    """Извлекает ссылки из Markdown-текста от LLM.
+
+    Поддерживает:
+    - Голые ссылки: - https://example.com - Описание
+    - MD-ссылки: 1. [Описание](https://example.com)
+    - Автоссылки: * <https://example.com> — Описание
     """
-    Извлекает идентификаторы из ответа LLM.
+    results = set()
 
-    Идентификатор — это последовательность цифр и латинских букв (a-z, A-Z, 0-9),
-    которой предшествует от 0 до 10 не-цифровых символов от начала строки.
-    Идентификатор заканчивается при появлении любого символа, не являющегося
-    цифрой или латинской буквой.
-
-    Args:
-        answer: Текст ответа LLM, в котором нужно найти идентификаторы.
-
-    Returns:
-        Множество найденных идентификаторов.
-    """
+    # Паттерн ищет:
+    # 1. Опциональный маркер списка в начале строки (-, *, +, 1.)
+    # 2. Либо MD-ссылку [title](url), либо голый/угловой URL
+    # 3. Опциональный разделитель (-, –, —, :) и оставшийся текст строки как описание
     pattern = re.compile(
-        r"^[^\d]{0,10}"   # от 0 до 10 не-цифровых символов от начала строки
-        r"([A-Za-z0-9_-]+)" # идентификатор: цифры и латинские буквы
-        r"(?:[^A-Za-z0-9]|$)",  # конец идентификатора: не цифра/не лат. буква или конец строки
-        re.MULTILINE
+        r"^\s*(?:[-*+]|\d+[.)])?\s*"
+        r"(?:\[(?P<md_title>[^\]]+)\]\((?P<md_url>https?://[^\s)]+)\)|<?(?P<raw_url>https?://[^\s>]+)>?)"
+        r"(?:\s*[-–—:]\s*(?P<desc>.+))?$",
+        re.MULTILINE,
     )
 
-    found_identifiers = {match.group(1) for match in pattern.finditer(answer)}
+    for match in pattern.finditer(text):
+        url = match.group("md_url") or match.group("raw_url")
+        # Очищаем случайную пунктуацию в конце голого URL (например, точку или запятую)
+        url = url.rstrip(".,;:!?")
 
-    if not found_identifiers:
-        logger.error(f"Не удалось извлечь идентификаторы из ответа LLM. Проверьте формат вывода.")
-        raise ValueError(f"Не удалось извлечь идентификаторы из ответа LLM. Проверьте формат вывода.")
-    return found_identifiers
+        results.add(url)
+
+    return results
 
 
 def filter_valid_news_and_docs(data: list[dict], filtered_IDs: set[str]) -> list[dict]:
@@ -112,7 +113,7 @@ def filter_valid_news_and_docs(data: list[dict], filtered_IDs: set[str]) -> list
     return list(filter(item_id_matches_any_chosen_id, data))
 
 
-def summarize_single_news(
+def summarize_single_item(
     news_item: dict[str],
     deepseek_settings: dict,
     custom_instruction: str = ""

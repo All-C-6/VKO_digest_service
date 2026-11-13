@@ -8,8 +8,10 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn, nsdecls
 
-from utils import generate_qr_buffer
+from utils import generate_qr_buffer, setup_logging
 
+
+logger = setup_logging(log_file_path="logs/formatter.log", level="INFO")
 
 def clean_title(title: str) -> str:
     """Очищает заголовок от markdown-разметки, эмодзи и неразрывных пробелов."""
@@ -230,4 +232,4 @@ def create_digest_document(items: list[dict], output_path: str = "дайджес
         col.width = int(col_widths[i])
 
     doc.save(output_path)
-    print(f"Документ успешно сохранен: {output_path}")
+    logger.info(f"Документ успешно сохранен: {output_path}")

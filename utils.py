@@ -13,6 +13,8 @@ from io import BytesIO
 import segno
 import yaml
 from PIL import Image
+import socket
+import time
 
 
 def setup_logging(log_file_path: str = None, level="INFO", logger_name: str = None, log_to: list = ["file"]):
@@ -305,6 +307,8 @@ def generate_and_bind_qr_files(items: list[dict], output_dir: str = "output/qrs"
         if not item_id or not item_id:
             continue
 
+        if item_id.startwith("http://") or item_id.startswith("https://"):
+            item_id = item_id[item_id.find("://") + 3:]  # Убираем протокол из ID, если он есть
         file_path = qr_dir / f"{item_id}.png"
         
         # Генерируем напрямую в файл (segno умеет писать сразу в путь)
@@ -391,3 +395,13 @@ def save_valid_sert(bundle_filename: str, host="roskazna.gov.ru"):
 
     logger.info(f"Успешно! Файл '{bundle_filename}' создан.")
 
+
+def wait_for_port(port: int, host: str = "127.0.0.1", timeout: float = 30.0) -> None:
+    """Ожидает, пока сервер начнет принимать подключения на указанном порту."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            if sock.connect_ex((host, port)) == 0:
+                return
+        time.sleep(0.5)
+    raise TimeoutError(f"Сервер не запустился на порту {port} за {timeout} сек.")

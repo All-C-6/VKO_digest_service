@@ -164,9 +164,8 @@ def get_latest_cbr_docs(start_date: datetime) -> list[dict[str, str]]:
                 # Проверяем, что документ опубликован позднее целевой даты
                 if parsed_publication_datetime > start_date:
                     document_info = {
-                        'id': document_guid.text.strip(),
+                        'id': document_link.text.strip(),
                         'title': document_title.text.strip(),
-                        'link': document_link.text.strip(),
                         'desc': document_description.text.strip() if document_description is not None else '',
                         'pub_date': parsed_publication_datetime.isoformat(),
                         'type': 'document'

@@ -110,15 +110,20 @@ def remove_markdown_links(text: str) -> str:
 
 def format_tg_post(post: dict) -> dict:
     """
-    document_info = {
-        'id': document_guid.text.strip(),
-        'title': document_title.text.strip(),
-        'link': document_link.text.strip(),
-        'desc': document_description.text.strip() if document_description is not None else '',
-        'pub_date': parsed_publication_datetime.isoformat(),
-        'type': 'news'
-    }
+    Форматирует объект поста в нужный вид.
+
+    Args:
+       - post(dict): пост из telegram в оригинальном виде
+
+    Returns:
+        post_dict: словарь с нужными ключами:
+            - id (str)
+            - title (str)
+            - desc (str)
+            - pub_date (str)
+            - type (str)
     """
+    
     text = post['text']
     formatted_text = remove_markdown_links(drop_unwanted_symbols(text))
     formatted_date = datetime.fromisoformat(post["date"]).strftime("%Y-%m-%d")
